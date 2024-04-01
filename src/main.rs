@@ -303,8 +303,8 @@ fn main() -> Result<()> {
         for pom in history.pomodoros.iter() {
           let date = pom.started_at.format("%d %b %R").to_string();
           let dur = human_duration(&pom.duration);
-          let tags = pom.tags.clone().unwrap_or(vec![]).join(",");
-          let desc = pom.description.clone().unwrap_or("".to_string());
+          let tags = pom.tags.clone().unwrap_or(vec!["-".to_string()]).join(",");
+          let desc = pom.description.clone().unwrap_or("-".to_string());
 
           table.add_row(Row::new(vec![
             Cell::new(&date),
