@@ -5,8 +5,8 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 use directories::ProjectDirs;
+use prettytable::{format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -27,7 +27,10 @@ enum Command {
     #[arg(short, long, default_value_t = 25)]
     minutes: u64,
     /// Description of the task you're focusing on
-    description: Option<String>
+    description: Option<String>,
+    /// Tags to categorize the work you're doing, comma-separated
+    #[arg(short, long)]
+    tags: Option<String>,
   },
   /// Remove the existing Pomodoro, if any
   Clear,
@@ -139,6 +142,7 @@ struct Pomodoro {
   #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
   duration: TimeDelta,
   description: Option<String>,
+  tags: Option<Vec<String>>,
 }
 
 impl Pomodoro {
@@ -147,11 +151,16 @@ impl Pomodoro {
       started_at,
       duration,
       description: None,
+      tags: None,
     }
   }
 
   pub fn set_description(&mut self, description: &str) {
     self.description = Some(description.to_string());
+  }
+
+  pub fn set_tags(&mut self, tags: Vec<String>) {
+    self.tags = Some(tags);
   }
 
   fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
@@ -237,7 +246,7 @@ fn main() -> Result<()> {
           Status::Inactive => println!("No active Pomodoro"),
         }
       },
-      Command::Start{ minutes, description } => {
+      Command::Start{ minutes, description, tags } => {
         let mut state = State::load(config)?;
 
         let minutes: i64 = minutes.clone().try_into().unwrap();
@@ -248,6 +257,13 @@ fn main() -> Result<()> {
         if let Some(desc) = description {
           pom.set_description(desc);
         }
+
+        if let Some(tags) = tags {
+          let tags: Vec<String> = tags.split(",").map(|s| s.to_string()).collect();
+
+          pom.set_tags(tags);
+        }
+
         state.start(pom)?;
         println!("Pomodoro started for {}", wallclock(&dur));
       },
@@ -271,14 +287,34 @@ fn main() -> Result<()> {
         let history_str = read_to_string(&config.history_file_path)?;
         let history: History = toml::from_str(&history_str)?;
 
-        println!("{} {} {}", "Date Started".underline(), "Duration".underline(), "Description".underline());
+        let mut table = Table::new();
+
+        table.set_titles(Row::new(vec![
+          Cell::new("Date Started")
+              .with_style(Attr::Underline(true)),
+          Cell::new("Duration")
+              .with_style(Attr::Underline(true)),
+          Cell::new("Tags")
+              .with_style(Attr::Underline(true)),
+          Cell::new("Description")
+              .with_style(Attr::Underline(true)),
+        ]));
 
         for pom in history.pomodoros.iter() {
-          let date = pom.started_at.format("%d %b %R");
-          let dur = human_duration(&pom.duration).dimmed();
+          let date = pom.started_at.format("%d %b %R").to_string();
+          let dur = human_duration(&pom.duration);
+          let tags = pom.tags.clone().unwrap_or(vec![]).join(",");
           let desc = pom.description.clone().unwrap_or("".to_string());
-          println!("{} {:>8} {}", date, dur, desc);
+
+          table.add_row(Row::new(vec![
+            Cell::new(&date),
+            Cell::new(&dur).style_spec("r").with_style(Attr::Dim),
+            Cell::new(&tags),
+            Cell::new(&desc),
+          ]));
         }
+        table.set_format(*format::consts::FORMAT_CLEAN);
+        table.printstd();
       },
       Command::Purge => {
         let state_file_path = config.state_file_path;
