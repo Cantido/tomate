@@ -86,23 +86,19 @@ impl State {
     }
   }
 
-  fn start(&self, duration: TimeDelta) -> Result<()> {
+  fn start(&mut self, pomodoro: Pomodoro) -> Result<()> {
     match &self.status() {
       Status::Done => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Active(_time_remaining) => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Inactive => {
-        let pom = Pomodoro::start(duration.clone());
+        self.current_pomodoro = Some(pomodoro);
 
         std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
-        std::fs::write(&self.config.state_file_path, toml::to_string(&pom)?)?;
+        std::fs::write(&self.config.state_file_path, toml::to_string(&self.current_pomodoro)?)?;
 
         Ok(())
       }
     }
-  }
-
-  fn current_pomodoro_mut(&mut self) -> Option<&mut Pomodoro> {
-    self.current_pomodoro.as_mut()
   }
 
   fn finish(&self) -> Result<()> {
@@ -139,10 +135,10 @@ impl State {
 #[derive(Debug, Serialize, Deserialize)]
 struct Pomodoro {
   #[serde(rename = "start_time")]
-  pub started_at: DateTime<Local>,
+  started_at: DateTime<Local>,
   #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
-  pub duration: TimeDelta,
-  pub description: Option<String>,
+  duration: TimeDelta,
+  description: Option<String>,
 }
 
 impl Pomodoro {
@@ -154,8 +150,8 @@ impl Pomodoro {
     }
   }
 
-  fn start(duration: TimeDelta) -> Self {
-    Self::new(Local::now(), duration)
+  pub fn set_description(&mut self, description: &str) {
+    self.description = Some(description.to_string());
   }
 
   fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
@@ -247,10 +243,12 @@ fn main() -> Result<()> {
         let minutes: i64 = minutes.clone().try_into().unwrap();
         let dur = TimeDelta::new(minutes * 60, 0).unwrap();
 
-        state.start(dur)?;
+        let mut pom = Pomodoro::new(Local::now(), dur);
+
         if let Some(desc) = description {
-          state.current_pomodoro_mut().unwrap().description = Some(desc.to_string());
+          pom.set_description(desc);
         }
+        state.start(pom)?;
         println!("Pomodoro started for {}", wallclock(&dur));
       },
       Command::Finish => {
@@ -277,7 +275,7 @@ fn main() -> Result<()> {
 
         for pom in history.pomodoros.iter() {
           let date = pom.started_at.format("%d %b %R");
-          let dur = human_duration(&pom.duration);
+          let dur = human_duration(&pom.duration).dimmed();
           let desc = pom.description.clone().unwrap_or("".to_string());
           println!("{} {:>8} {}", date, dur, desc);
         }
