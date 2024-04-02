@@ -68,15 +68,27 @@ fn duration_parser(input: &str) -> Result<TimeDelta> {
     .with_context(|| format!("Failed to build TimeDelta from input {}", input))
 }
 
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "status")]
 enum Status {
   Inactive,
   Active(Pomodoro),
   ShortBreak(Timer),
 }
 
+impl Status {
+  fn timer(&self) -> Option<Timer> {
+    match self {
+      Status::Inactive => None,
+      Status::Active(pom) => Some(pom.timer()),
+      Status::ShortBreak(timer) => Some(timer.clone()),
+    }
+  }
+}
+
 struct Program {
   pub config: Config,
-  pub current_pomodoro: Option<Pomodoro>,
   status: Status,
 }
 
@@ -84,7 +96,6 @@ impl Program {
   fn new(config: Config) -> Self {
     Self {
       config,
-      current_pomodoro: None,
       status: Status::Inactive,
     }
   }
@@ -95,13 +106,9 @@ impl Program {
     self.status =
       if let Ok(true) = state_file_path.try_exists() {
         let state_str = read_to_string(state_file_path)?;
-        let pom: Pomodoro = toml::from_str(&state_str)?;
+        let status: Status = toml::from_str(&state_str)?;
 
-        if pom.taking_break {
-          Status::ShortBreak(Timer::new(pom.started_at, pom.duration))
-        } else {
-          Status::Active(pom)
-        }
+        status
       } else {
         Status::Inactive
       };
@@ -133,7 +140,7 @@ impl Program {
         println!();
 
         if progress {
-          Self::print_progress_bar(&Timer::new(pom.started_at, pom.duration));
+          Self::print_progress_bar(&pom.timer());
           println!();
           println!();
         } else {
@@ -201,16 +208,18 @@ impl Program {
       Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
       Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Inactive => {
-        self.current_pomodoro = Some(pomodoro);
+        self.status = Status::Active(pomodoro);
 
         println!("Creating Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
 
         std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
-        std::fs::write(&self.config.state_file_path, toml::to_string(&self.current_pomodoro)?)?;
+        std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
 
-        if progress {
+        let timer = self.status.timer();
+
+        if progress && timer.is_some() {
           println!();
-          Self::print_progress_bar(&self.current_pomodoro.as_ref().unwrap().timer());
+          Self::print_progress_bar(&timer.unwrap());
         }
 
         Ok(())
@@ -224,16 +233,15 @@ impl Program {
       Status::ShortBreak(_timer) => {
         self.clear()?;
       },
-      Status::Active(_pom) => {
-        let state_file_path = &self.config.state_file_path;
+      Status::Active(pom) => {
         let history_file_path = &self.config.history_file_path;
-        let state_str = read_to_string(&state_file_path)?;
+        let pom_str = toml::to_string(&pom)?;
 
         println!("Archiving Pomodoro to {}", &self.config.history_file_path.display().to_string().cyan());
 
         std::fs::create_dir_all(history_file_path.parent().with_context(|| "History file path does not have a parent directory")?)?;
         let mut history_file = OpenOptions::new().create(true).write(true).append(true).open(&history_file_path)?;
-        writeln!(history_file, "[[pomodoros]]\n{}", state_str)?;
+        writeln!(history_file, "[[pomodoros]]\n{}", pom_str)?;
 
         self.clear()?;
       }
@@ -248,13 +256,13 @@ impl Program {
     if state_file_path.exists() {
       println!("Deleting current Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
       std::fs::remove_file(&self.config.state_file_path)?;
-      self.current_pomodoro = None;
+      self.status = Status::Inactive;
     }
 
     Ok(())
   }
 
-  fn take_break(&mut self, pomodoro: Pomodoro) -> Result<()> {
+  fn take_break(&mut self, timer: Timer) -> Result<()> {
     if matches!(self.status, Status::ShortBreak(_)) {
       bail!("You are already taking a break");
     }
@@ -265,9 +273,9 @@ impl Program {
 
     println!("Creating Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
 
-    self.current_pomodoro = Some(pomodoro);
+    self.status = Status::ShortBreak(timer);
     std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
-    std::fs::write(&self.config.state_file_path, toml::to_string(&self.current_pomodoro)?)?;
+    std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
 
     Ok(())
   }
@@ -327,7 +335,7 @@ impl Program {
   }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Timer {
   started_at: DateTime<Local>,
   #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
@@ -355,8 +363,6 @@ impl Timer {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Pomodoro {
-  #[serde(default)]
-  taking_break: bool,
   #[serde(rename = "start_time")]
   started_at: DateTime<Local>,
   #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
@@ -370,14 +376,9 @@ impl Pomodoro {
     Self {
       started_at,
       duration,
-      taking_break: false,
       description: None,
       tags: None,
     }
-  }
-
-  pub fn set_break(&mut self) {
-    self.taking_break = true;
   }
 
   pub fn set_description(&mut self, description: &str) {
@@ -511,10 +512,8 @@ fn main() -> Result<()> {
 
         let duration = TimeDelta::new(5 * 60, 0).unwrap();
 
-        let mut pom = Pomodoro::new(Local::now(), duration);
-        pom.set_break();
-
-        state.take_break(pom)?;
+        let timer = Timer::new(Local::now(), duration);
+        state.take_break(timer)?;
       },
       Command::History => {
         let state = Program::new(config);
@@ -575,20 +574,23 @@ fn human_duration(t: &TimeDelta) -> String {
 mod test {
     use chrono::{prelude::*, TimeDelta};
 
-    use crate::{Pomodoro, wallclock};
+    use crate::{wallclock, Pomodoro, Status};
 
   #[test]
-  fn pom_to_toml() {
+  fn status_to_toml() {
     let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
     let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
     let pom = Pomodoro::new(dt, dur);
 
-    let toml = toml::to_string_pretty(&pom).unwrap();
+    let status = Status::Active(pom);
+
+    let toml = toml::to_string_pretty(&status).unwrap();
     let lines: Vec<&str> = toml.lines().collect();
 
-    assert_eq!(lines[0], "start_time = \"2024-03-27T12:00:00-06:00\"");
-    assert_eq!(lines[1], "duration = \"PT1500S\"");
+    assert_eq!(lines[0], "status = \"Active\"");
+    assert_eq!(lines[1], "start_time = \"2024-03-27T12:00:00-06:00\"");
+    assert_eq!(lines[2], "duration = \"PT1500S\"");
   }
 
   #[test]
