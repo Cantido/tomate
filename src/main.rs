@@ -1,5 +1,5 @@
 use std::{
-  fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
+  fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf, thread::sleep, time::Duration
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -7,6 +7,7 @@ use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use directories::ProjectDirs;
+use indicatif::{ProgressBar, ProgressStyle};
 use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -21,7 +22,11 @@ struct Args {
 #[derive(Debug, Subcommand)]
 enum Command {
   /// Get the current Pomodoro
-  Status,
+  Status {
+    /// Show a progress bar and don't exit until the current timer is over
+    #[arg(short, long, default_value_t = false)]
+    progress: bool,
+  },
   /// Start a Pomodoro
   Start {
     /// Length of the Pomodoro to start
@@ -32,6 +37,9 @@ enum Command {
     /// Tags to categorize the work you're doing, comma-separated
     #[arg(short, long)]
     tags: Option<String>,
+    /// Show a progress bar and don't exit until the current timer is over
+    #[arg(short, long, default_value_t = false)]
+    progress: bool,
   },
   /// Remove the existing Pomodoro, if any
   Clear,
@@ -153,6 +161,34 @@ impl State {
         println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
       },
     }
+  }
+
+  fn print_progress_bar(&self) {
+    let pom = self.current_pomodoro.as_ref().unwrap();
+    let mut now = Local::now();
+    let end_time = pom.started_at + pom.duration;
+
+    let bar = ProgressBar::new(pom.duration.num_milliseconds().try_into().unwrap());
+    bar.set_style(ProgressStyle::with_template("{prefix} {bar:40.blue} {msg}").unwrap());
+
+    loop {
+      let elapsed = (now - pom.started_at).min(pom.duration);
+      let remaining = (end_time - now).max(TimeDelta::zero());
+
+      bar.set_position(elapsed.num_milliseconds().try_into().unwrap());
+      bar.set_prefix(wallclock(&elapsed));
+      bar.set_message(wallclock(&remaining));
+
+      sleep(Duration::from_millis(66));
+
+      now = Local::now();
+
+      if now > end_time {
+        break;
+      }
+    }
+
+    bar.finish();
   }
 
   fn start(&mut self, pomodoro: Pomodoro) -> Result<()> {
@@ -361,15 +397,19 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match &args.command {
-      Command::Status => {
+      Command::Status { progress } => {
         let state = State::load(config)?;
+
         state.print_status();
+        if *progress {
+          println!();
+          state.print_progress_bar();
+        }
       },
-      Command::Start{ duration, description, tags } => {
+      Command::Start{ duration, description, tags, progress } => {
         let mut state = State::load(config)?;
 
         let mut pom = Pomodoro::new(Local::now(), *duration);
-
         if let Some(desc) = description {
           pom.set_description(desc);
         }
@@ -381,6 +421,10 @@ fn main() -> Result<()> {
         }
 
         state.start(pom)?;
+        if *progress {
+          println!();
+          state.print_progress_bar();
+        }
       },
       Command::Finish => {
         let mut state = State::load(config)?;
