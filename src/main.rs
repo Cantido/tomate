@@ -488,6 +488,7 @@ struct Config {
   pub state_file_path: PathBuf,
   pub history_file_path: PathBuf,
   pub pomodoro_duration: TimeDelta,
+  pub short_break_duration: TimeDelta,
 }
 
 impl Default for Config {
@@ -517,6 +518,7 @@ impl Default for Config {
         state_file_path,
         history_file_path,
         pomodoro_duration: TimeDelta::new(25 * 60, 0).unwrap(),
+        short_break_duration: TimeDelta::new(5 * 60, 0).unwrap(),
       }
   }
 }
@@ -569,9 +571,7 @@ fn main() -> Result<()> {
         let mut state = Program::new(config);
         state.load_state()?;
 
-        let duration = TimeDelta::new(5 * 60, 0).unwrap();
-
-        let timer = Timer::new(Local::now(), duration);
+        let timer = Timer::new(Local::now(), state.config.short_break_duration);
         state.take_break(timer)?;
       },
       Command::History => {
