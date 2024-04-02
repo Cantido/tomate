@@ -215,6 +215,8 @@ impl Program {
         std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
         std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
 
+        self.run_start_hook()?;
+
         let timer = self.status.timer();
 
         if progress && timer.is_some() {
@@ -333,6 +335,20 @@ impl Program {
 
     Ok(())
   }
+
+  fn run_start_hook(&self) -> Result<()> {
+    let start_hook_path = self.config.hooks_directory.join("start");
+
+    if start_hook_path.exists() {
+      println!("Executing start hook at {}", start_hook_path.display().to_string().cyan());
+
+      std::process::Command::new(start_hook_path)
+        .output()
+        .with_context(|| "Failed to execute start hook")?;
+    }
+
+    Ok(())
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -436,6 +452,7 @@ struct History {
 }
 
 struct Config {
+  pub hooks_directory: PathBuf,
   pub state_file_path: PathBuf,
   pub history_file_path: PathBuf,
 }
@@ -445,6 +462,11 @@ impl Default for Config {
       let project_dirs =
         ProjectDirs::from("dev", "Cosmicrose", "Tomate")
         .with_context(|| "Unable to determine XDG directories").unwrap();
+
+      let hooks_directory =
+        project_dirs
+        .config_dir()
+        .join("hooks");
 
       let state_file_path =
         project_dirs
@@ -458,6 +480,7 @@ impl Default for Config {
         .join("history.toml");
 
       Self {
+        hooks_directory,
         state_file_path,
         history_file_path,
       }
