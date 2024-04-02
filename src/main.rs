@@ -75,12 +75,12 @@ enum Status<'a> {
   ShortBreak(Timer),
 }
 
-struct State {
+struct Program {
   pub config: Config,
   pub current_pomodoro: Option<Pomodoro>,
 }
 
-impl State {
+impl Program {
   fn new(config: Config) -> Self {
     Self {
       config,
@@ -487,13 +487,13 @@ fn main() -> Result<()> {
 
     match &args.command {
       Command::Status { progress } => {
-        let mut state = State::new(config);
+        let mut state = Program::new(config);
         state.load_state()?;
 
         state.print_status(*progress);
       },
       Command::Start{ duration, description, tags, progress } => {
-        let mut state = State::new(config);
+        let mut state = Program::new(config);
         state.load_state()?;
 
         let mut pom = Pomodoro::new(Local::now(), *duration);
@@ -514,19 +514,19 @@ fn main() -> Result<()> {
         }
       },
       Command::Finish => {
-        let mut state = State::new(config);
+        let mut state = Program::new(config);
         state.load_state()?;
 
         state.finish()?;
       },
       Command::Clear => {
-        let mut state = State::new(config);
+        let mut state = Program::new(config);
         state.load_state()?;
 
         state.clear()?;
       },
       Command::Break => {
-        let mut state = State::new(config);
+        let mut state = Program::new(config);
         state.load_state()?;
 
         let duration = TimeDelta::new(5 * 60, 0).unwrap();
@@ -537,12 +537,12 @@ fn main() -> Result<()> {
         state.take_break(pom)?;
       },
       Command::History => {
-        let state = State::new(config);
+        let state = Program::new(config);
 
         state.print_history()?;
       },
       Command::Purge => {
-        let mut state = State::new(config);
+        let mut state = Program::new(config);
 
         state.purge()?;
       },
