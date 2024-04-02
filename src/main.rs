@@ -78,10 +78,17 @@ struct State {
 }
 
 impl State {
-  fn load(config: Config) -> Result<Self> {
-    let state_file_path = &config.state_file_path;
+  fn new(config: Config) -> Self {
+    Self {
+      config,
+      current_pomodoro: None,
+    }
+  }
 
-    let current_pomodoro = {
+  fn load_state(&mut self) -> Result<()> {
+    let state_file_path = &self.config.state_file_path;
+
+    self.current_pomodoro =
       if let Ok(true) = state_file_path.try_exists() {
         let state_str = read_to_string(state_file_path)?;
         let pom: Pomodoro = toml::from_str(&state_str)?;
@@ -89,13 +96,9 @@ impl State {
         Some(pom)
       } else {
         None
-      }
-    };
+      };
 
-    Ok(Self {
-      config,
-      current_pomodoro,
-    })
+    Ok(())
   }
 
   fn status(&self) -> Status {
@@ -411,12 +414,14 @@ fn main() -> Result<()> {
 
     match &args.command {
       Command::Status { progress } => {
-        let state = State::load(config)?;
+        let mut state = State::new(config);
+        state.load_state()?;
 
         state.print_status(*progress);
       },
       Command::Start{ duration, description, tags, progress } => {
-        let mut state = State::load(config)?;
+        let mut state = State::new(config);
+        state.load_state()?;
 
         let mut pom = Pomodoro::new(Local::now(), *duration);
         if let Some(desc) = description {
@@ -436,22 +441,24 @@ fn main() -> Result<()> {
         }
       },
       Command::Finish => {
-        let mut state = State::load(config)?;
+        let mut state = State::new(config);
+        state.load_state()?;
 
         state.finish()?;
       },
       Command::Clear => {
-        let mut state = State::load(config)?;
+        let mut state = State::new(config);
+        state.load_state()?;
 
         state.clear()?;
       },
       Command::History => {
-        let state = State::load(config)?;
+        let state = State::new(config);
 
         state.print_history()?;
       },
       Command::Purge => {
-        let mut state = State::load(config)?;
+        let mut state = State::new(config);
 
         state.purge()?;
       },
