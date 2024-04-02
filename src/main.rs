@@ -30,8 +30,8 @@ enum Command {
   /// Start a Pomodoro
   Start {
     /// Length of the Pomodoro to start
-    #[arg(short, long, value_parser = duration_parser, default_value = "25m")]
-    duration: TimeDelta,
+    #[arg(short, long, value_parser = duration_parser)]
+    duration: Option<TimeDelta>,
     /// Description of the task you're focusing on
     description: Option<String>,
     /// Tags to categorize the work you're doing, comma-separated
@@ -487,6 +487,7 @@ struct Config {
   pub hooks_directory: PathBuf,
   pub state_file_path: PathBuf,
   pub history_file_path: PathBuf,
+  pub pomodoro_duration: TimeDelta,
 }
 
 impl Default for Config {
@@ -515,6 +516,7 @@ impl Default for Config {
         hooks_directory,
         state_file_path,
         history_file_path,
+        pomodoro_duration: TimeDelta::new(25 * 60, 0).unwrap(),
       }
   }
 }
@@ -536,7 +538,9 @@ fn main() -> Result<()> {
         let mut state = Program::new(config);
         state.load_state()?;
 
-        let mut pom = Pomodoro::new(Local::now(), *duration);
+        let dur = duration.unwrap_or(state.config.pomodoro_duration);
+
+        let mut pom = Pomodoro::new(Local::now(), dur);
         if let Some(desc) = description {
           pom.set_description(desc);
         }
