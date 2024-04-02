@@ -5,8 +5,9 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use directories::ProjectDirs;
-use prettytable::{format, Attr, Cell, Row, Table};
+use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -109,47 +110,47 @@ impl State {
       Status::Done => {
         let pom = self.current_pomodoro.as_ref().unwrap();
         if let Some(desc) = &pom.description {
-          println!("Current Pomodoro: {}", desc);
+          println!("Current Pomodoro: {}", desc.yellow());
         } else {
           println!("Current Pomodoro");
         }
-        println!("Status: Done");
-        println!("Duration: {}", human_duration(&pom.duration));
+        println!("Status: {}", "Done".red().bold());
+        println!("Duration: {}", human_duration(&pom.duration).cyan());
         if let Some(tags) = &pom.tags {
           println!("Tags:");
           for tag in tags {
-            println!("\t- {}", tag);
+            println!("\t- {}", tag.blue());
           }
         }
         println!("");
-        println!("(use \"tomate finish\" to archive this Pomodoro)");
-        println!("(use \"tomate clear\" to delete this Pomodoro)");
+        println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
+        println!("{}", "(use \"tomate clear\" to delete this Pomodoro)".dimmed());
       },
       Status::Active(time_remaining) => {
         let pom = self.current_pomodoro.as_ref().unwrap();
         if let Some(desc) = &pom.description {
-          println!("Current Pomodoro: {}", desc);
+          println!("Current Pomodoro: {}", desc.yellow());
         } else {
           println!("Current Pomodoro");
         }
-        println!("Status: Active");
-        println!("Duration: {}", human_duration(&pom.duration));
+        println!("Status: {}", "Active".magenta().bold());
+        println!("Duration: {}", human_duration(&pom.duration).cyan());
         if let Some(tags) = &pom.tags {
           println!("Tags:");
           for tag in tags {
-            println!("\t- {}", tag);
+            println!("\t- {}", tag.blue());
           }
         }
         println!("");
         println!("Time remaining: {}", wallclock(&time_remaining));
         println!("");
-        println!("(use \"tomate finish\" to archive this Pomodoro)");
-        println!("(use \"tomate clear\" to delete this Pomodoro)");
+        println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
+        println!("{}", "(use \"tomate clear\" to delete this Pomodoro)".dimmed());
       },
       Status::Inactive => {
         println!("No current Pomodoro");
         println!("");
-        println!("(use \"tomate start\" to start a Pomodoro)");
+        println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
       },
     }
   }
@@ -161,7 +162,7 @@ impl State {
       Status::Inactive => {
         self.current_pomodoro = Some(pomodoro);
 
-        println!("Creating Pomodoro state file {}", &self.config.state_file_path.display());
+        println!("Creating Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
 
         std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
         std::fs::write(&self.config.state_file_path, toml::to_string(&self.current_pomodoro)?)?;
@@ -180,7 +181,7 @@ impl State {
     let history_file_path = &self.config.history_file_path;
     let state_str = read_to_string(&state_file_path)?;
 
-    println!("Archiving Pomodoro to {}", &self.config.history_file_path.display());
+    println!("Archiving Pomodoro to {}", &self.config.history_file_path.display().to_string().cyan());
 
     std::fs::create_dir_all(history_file_path.parent().with_context(|| "History file path does not have a parent directory")?)?;
     let mut history_file = OpenOptions::new().create(true).write(true).append(true).open(&history_file_path)?;
@@ -195,7 +196,7 @@ impl State {
     let state_file_path = &self.config.state_file_path;
 
     if state_file_path.exists() {
-      println!("Deleting current Pomodoro state file {}", &self.config.state_file_path.display());
+      println!("Deleting current Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
       std::fs::remove_file(&self.config.state_file_path)?;
       self.current_pomodoro = None;
     }
@@ -231,8 +232,8 @@ impl State {
       let desc = pom.description.clone().unwrap_or("-".to_string());
 
       table.add_row(Row::new(vec![
-        Cell::new(&date),
-        Cell::new(&dur).style_spec("r").with_style(Attr::Dim),
+        Cell::new(&date).with_style(Attr::ForegroundColor(color::BLUE)),
+        Cell::new(&dur).style_spec("r").with_style(Attr::ForegroundColor(color::CYAN)),
         Cell::new(&tags),
         Cell::new(&desc),
       ]));
@@ -245,12 +246,12 @@ impl State {
 
   fn purge(&mut self) -> Result<()> {
     if self.config.state_file_path.exists() {
-      println!("Removing current Pomodoro file at {}", self.config.state_file_path.display());
+      println!("Removing current Pomodoro file at {}", self.config.state_file_path.display().to_string().cyan());
       std::fs::remove_file(&self.config.state_file_path)?;
     }
 
     if self.config.history_file_path.exists() {
-      println!("Removing Tomate history file at {}", self.config.history_file_path.display());
+      println!("Removing history file at {}", self.config.history_file_path.display().to_string().cyan());
       std::fs::remove_file(&self.config.history_file_path)?;
     }
 
