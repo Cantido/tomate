@@ -50,6 +50,9 @@ enum Command {
     /// Length of the break to start
     #[arg(short, long, value_parser = duration_parser)]
     duration: Option<TimeDelta>,
+    /// Show a progress bar and don't exit until the current timer is over
+    #[arg(short, long, default_value_t = false)]
+    progress: bool,
   },
   /// Print a list of all logged Pomodoros
   History,
@@ -270,7 +273,7 @@ impl Program {
     Ok(())
   }
 
-  fn take_break(&mut self, timer: Timer) -> Result<()> {
+  fn take_break(&mut self, timer: Timer, show_progress: bool) -> Result<()> {
     if matches!(self.status, Status::ShortBreak(_)) {
       bail!("You are already taking a break");
     }
@@ -281,11 +284,16 @@ impl Program {
 
     println!("Creating Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
 
-    self.status = Status::ShortBreak(timer);
+    self.status = Status::ShortBreak(timer.clone());
     std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
     std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
 
     self.run_break_hook()?;
+
+    if show_progress {
+      println!();
+      Self::print_progress_bar(&timer);
+    }
 
     Ok(())
   }
@@ -571,14 +579,14 @@ fn main() -> Result<()> {
 
         state.clear()?;
       },
-      Command::Break { duration } => {
+      Command::Break { duration, progress } => {
         let mut state = Program::new(config);
         state.load_state()?;
 
         let dur = duration.unwrap_or(state.config.short_break_duration);
 
         let timer = Timer::new(Local::now(), dur);
-        state.take_break(timer)?;
+        state.take_break(timer, *progress)?;
       },
       Command::History => {
         let state = Program::new(config);
