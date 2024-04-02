@@ -17,6 +17,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 struct Args {
   #[command(subcommand)]
   command: Command,
+  /// Config file to use. [default: ${XDG_CONFIG_DIR}/tomate/config.toml]
+  config: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -495,12 +497,28 @@ struct History {
   pomodoros: Vec<Pomodoro>
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 struct Config {
   pub hooks_directory: PathBuf,
   pub state_file_path: PathBuf,
   pub history_file_path: PathBuf,
+  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
   pub pomodoro_duration: TimeDelta,
+  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
   pub short_break_duration: TimeDelta,
+}
+
+impl Config {
+  fn load(path: &PathBuf) -> Result<Option<Self>> {
+    if path.exists() {
+      let config_str = read_to_string(path)?;
+
+      toml::from_str(&config_str)
+        .with_context(|| "Failed to parse config from TOML")
+    } else {
+      Ok(None)
+    }
+  }
 }
 
 impl Default for Config {
@@ -535,11 +553,40 @@ impl Default for Config {
   }
 }
 
+fn default_config_path() -> Result<PathBuf> {
+  let conf_path =
+    ProjectDirs::from("dev", "Cosmicrose", "Tomate")
+    .with_context(|| "Unable to determine XDG directories")?
+    .config_dir()
+    .join("config.toml");
+
+  Ok(conf_path)
+}
+
 
 fn main() -> Result<()> {
-    let config = Config::default();
-
     let args = Args::parse();
+
+    let config_path =
+      if let Some(conf_path) = args.config {
+        conf_path
+      } else {
+        default_config_path()?
+      };
+
+    let config =
+      if let Some(conf) = Config::load(&config_path)? {
+        conf
+      } else {
+        let conf = Config::default();
+
+        println!("Creating config file at {}", config_path.display().to_string().cyan());
+        println!();
+        std::fs::write(config_path, toml::to_string(&conf)?)?;
+
+        conf
+      };
+
 
     match &args.command {
       Command::Status { progress } => {
