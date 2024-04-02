@@ -23,8 +23,8 @@ enum Command {
   Status,
   /// Start a Pomodoro
   Start {
-    /// Length of the Pomodoro to start, in minutes
-    #[arg(short, long, value_parser = duration_parser)]
+    /// Length of the Pomodoro to start
+    #[arg(short, long, value_parser = duration_parser, default_value = "25m")]
     duration: TimeDelta,
     /// Description of the task you're focusing on
     description: Option<String>,
@@ -109,10 +109,11 @@ impl State {
       Status::Done => {
         let pom = self.current_pomodoro.as_ref().unwrap();
         if let Some(desc) = &pom.description {
-          println!("Pomodoro done: {}", desc);
+          println!("Current Pomodoro: {}", desc);
         } else {
-          println!("Pomodoro done");
+          println!("Current Pomodoro");
         }
+        println!("Status: Done");
         println!("Duration: {}", human_duration(&pom.duration));
         if let Some(tags) = &pom.tags {
           println!("Tags:");
@@ -127,10 +128,11 @@ impl State {
       Status::Active(time_remaining) => {
         let pom = self.current_pomodoro.as_ref().unwrap();
         if let Some(desc) = &pom.description {
-          println!("Pomodoro active: {}", desc);
+          println!("Current Pomodoro: {}", desc);
         } else {
-          println!("Pomodoro active");
+          println!("Current Pomodoro");
         }
+        println!("Status: Active");
         println!("Duration: {}", human_duration(&pom.duration));
         if let Some(tags) = &pom.tags {
           println!("Tags:");
@@ -145,7 +147,7 @@ impl State {
         println!("(use \"tomate clear\" to delete this Pomodoro)");
       },
       Status::Inactive => {
-        println!("No active Pomodoro");
+        println!("No current Pomodoro");
         println!("");
         println!("(use \"tomate start\" to start a Pomodoro)");
       },
