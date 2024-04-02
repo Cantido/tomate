@@ -46,7 +46,11 @@ enum Command {
   /// Finish a Pomodoro
   Finish,
   /// Take a break
-  Break,
+  Break {
+    /// Length of the break to start
+    #[arg(short, long, value_parser = duration_parser)]
+    duration: Option<TimeDelta>,
+  },
   /// Print a list of all logged Pomodoros
   History,
   /// Delete all state and configuration files
@@ -567,11 +571,13 @@ fn main() -> Result<()> {
 
         state.clear()?;
       },
-      Command::Break => {
+      Command::Break { duration } => {
         let mut state = Program::new(config);
         state.load_state()?;
 
-        let timer = Timer::new(Local::now(), state.config.short_break_duration);
+        let dur = duration.unwrap_or(state.config.short_break_duration);
+
+        let timer = Timer::new(Local::now(), dur);
         state.take_break(timer)?;
       },
       Command::History => {
