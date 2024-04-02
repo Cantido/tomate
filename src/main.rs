@@ -43,7 +43,7 @@ enum Command {
 }
 
 fn duration_parser(input: &str) -> Result<TimeDelta> {
-  let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$")?;
+  let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$").unwrap();
   let caps = re.captures(&input)
     .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
 
