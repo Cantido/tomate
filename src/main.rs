@@ -1,5 +1,5 @@
 use std::{
-  fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf,
+  fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -89,12 +89,62 @@ impl State {
     }
   }
 
+  fn print_status(&self) {
+    match self.status() {
+      Status::Done => {
+        let pom = self.current_pomodoro.as_ref().unwrap();
+        if let Some(desc) = &pom.description {
+          println!("Pomodoro done: {}", desc);
+        } else {
+          println!("Pomodoro done");
+        }
+        println!("Duration: {}", human_duration(&pom.duration));
+        if let Some(tags) = &pom.tags {
+          println!("Tags:");
+          for tag in tags {
+            println!("\t- {}", tag);
+          }
+        }
+        println!("");
+        println!("(use \"tomate finish\" to archive this Pomodoro)");
+        println!("(use \"tomate clear\" to delete this Pomodoro)");
+      },
+      Status::Active(time_remaining) => {
+        let pom = self.current_pomodoro.as_ref().unwrap();
+        if let Some(desc) = &pom.description {
+          println!("Pomodoro active: {}", desc);
+        } else {
+          println!("Pomodoro active");
+        }
+        println!("Duration: {}", human_duration(&pom.duration));
+        if let Some(tags) = &pom.tags {
+          println!("Tags:");
+          for tag in tags {
+            println!("\t- {}", tag);
+          }
+        }
+        println!("");
+        println!("Time remaining: {}", wallclock(&time_remaining));
+        println!("");
+        println!("(use \"tomate finish\" to archive this Pomodoro)");
+        println!("(use \"tomate clear\" to delete this Pomodoro)");
+      },
+      Status::Inactive => {
+        println!("No active Pomodoro");
+        println!("");
+        println!("(use \"tomate start\" to start a Pomodoro)");
+      },
+    }
+  }
+
   fn start(&mut self, pomodoro: Pomodoro) -> Result<()> {
     match &self.status() {
       Status::Done => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Active(_time_remaining) => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Inactive => {
         self.current_pomodoro = Some(pomodoro);
+
+        println!("Creating Pomodoro state file {}", &self.config.state_file_path.display());
 
         std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
         std::fs::write(&self.config.state_file_path, toml::to_string(&self.current_pomodoro)?)?;
@@ -104,34 +154,90 @@ impl State {
     }
   }
 
-  fn finish(&self) -> Result<()> {
+  fn finish(&mut self) -> Result<()> {
     if matches!(&self.status(), Status::Inactive) {
-      bail!("No active Pomodoro");
+      bail!("No active Pomodoro. Start one with \"tomate start\"");
     }
 
     let state_file_path = &self.config.state_file_path;
     let history_file_path = &self.config.history_file_path;
-
     let state_str = read_to_string(&state_file_path)?;
+
+    println!("Archiving Pomodoro to {}", &self.config.history_file_path.display());
 
     std::fs::create_dir_all(history_file_path.parent().with_context(|| "History file path does not have a parent directory")?)?;
     let mut history_file = OpenOptions::new().create(true).write(true).append(true).open(&history_file_path)?;
     writeln!(history_file, "[[pomodoros]]\n{}", state_str)?;
 
-    std::fs::remove_file(&state_file_path)?;
+    self.clear()?;
 
     Ok(())
   }
 
-  fn clear(&self) -> Result<bool> {
+  fn clear(&mut self) -> Result<()> {
     let state_file_path = &self.config.state_file_path;
 
     if state_file_path.exists() {
+      println!("Deleting current Pomodoro state file {}", &self.config.state_file_path.display());
       std::fs::remove_file(&self.config.state_file_path)?;
-      Ok(true)
-    } else {
-      Ok(false)
+      self.current_pomodoro = None;
     }
+
+    Ok(())
+  }
+
+  fn print_history(&self) -> Result<()> {
+    if !self.config.history_file_path.exists() {
+      return Ok(());
+    }
+
+    let history_str = read_to_string(&self.config.history_file_path)?;
+    let history: History = toml::from_str(&history_str)?;
+
+    let mut table = Table::new();
+
+    table.set_titles(Row::new(vec![
+      Cell::new("Date Started")
+          .with_style(Attr::Underline(true)),
+      Cell::new("Duration")
+          .with_style(Attr::Underline(true)),
+      Cell::new("Tags")
+          .with_style(Attr::Underline(true)),
+      Cell::new("Description")
+          .with_style(Attr::Underline(true)),
+    ]));
+
+    for pom in history.pomodoros.iter() {
+      let date = pom.started_at.format("%d %b %R").to_string();
+      let dur = human_duration(&pom.duration);
+      let tags = pom.tags.clone().unwrap_or(vec!["-".to_string()]).join(",");
+      let desc = pom.description.clone().unwrap_or("-".to_string());
+
+      table.add_row(Row::new(vec![
+        Cell::new(&date),
+        Cell::new(&dur).style_spec("r").with_style(Attr::Dim),
+        Cell::new(&tags),
+        Cell::new(&desc),
+      ]));
+    }
+    table.set_format(*format::consts::FORMAT_CLEAN);
+    table.printstd();
+
+    Ok(())
+  }
+
+  fn purge(&mut self) -> Result<()> {
+    if self.config.state_file_path.exists() {
+      println!("Removing current Pomodoro file at {}", self.config.state_file_path.display());
+      std::fs::remove_file(&self.config.state_file_path)?;
+    }
+
+    if self.config.history_file_path.exists() {
+      println!("Removing Tomate history file at {}", self.config.history_file_path.display());
+      std::fs::remove_file(&self.config.history_file_path)?;
+    }
+
+    Ok(())
   }
 }
 
@@ -239,12 +345,7 @@ fn main() -> Result<()> {
     match &args.command {
       Command::Status => {
         let state = State::load(config)?;
-
-        match state.status() {
-          Status::Done => println!("Pomodoro done"),
-          Status::Active(time_remaining) => println!("Active: {} remaining", wallclock(&time_remaining)),
-          Status::Inactive => println!("No active Pomodoro"),
-        }
+        state.print_status();
       },
       Command::Start{ minutes, description, tags } => {
         let mut state = State::load(config)?;
@@ -265,69 +366,26 @@ fn main() -> Result<()> {
         }
 
         state.start(pom)?;
-        println!("Pomodoro started for {}", wallclock(&dur));
       },
       Command::Finish => {
-        let state = State::load(config)?;
+        let mut state = State::load(config)?;
 
         state.finish()?;
-
-        println!("Pomodoro finished and moved to {}", state.config.history_file_path.display());
       },
       Command::Clear => {
-        let state = State::load(config)?;
+        let mut state = State::load(config)?;
 
-        if state.clear()? {
-          println!("Pomodoro cleared");
-        } else {
-          println!("No Pomodoro to clear");
-        }
+        state.clear()?;
       },
       Command::History => {
-        let history_str = read_to_string(&config.history_file_path)?;
-        let history: History = toml::from_str(&history_str)?;
+        let state = State::load(config)?;
 
-        let mut table = Table::new();
-
-        table.set_titles(Row::new(vec![
-          Cell::new("Date Started")
-              .with_style(Attr::Underline(true)),
-          Cell::new("Duration")
-              .with_style(Attr::Underline(true)),
-          Cell::new("Tags")
-              .with_style(Attr::Underline(true)),
-          Cell::new("Description")
-              .with_style(Attr::Underline(true)),
-        ]));
-
-        for pom in history.pomodoros.iter() {
-          let date = pom.started_at.format("%d %b %R").to_string();
-          let dur = human_duration(&pom.duration);
-          let tags = pom.tags.clone().unwrap_or(vec!["-".to_string()]).join(",");
-          let desc = pom.description.clone().unwrap_or("-".to_string());
-
-          table.add_row(Row::new(vec![
-            Cell::new(&date),
-            Cell::new(&dur).style_spec("r").with_style(Attr::Dim),
-            Cell::new(&tags),
-            Cell::new(&desc),
-          ]));
-        }
-        table.set_format(*format::consts::FORMAT_CLEAN);
-        table.printstd();
+        state.print_history()?;
       },
       Command::Purge => {
-        let state_file_path = config.state_file_path;
-        if state_file_path.exists() {
-          println!("Removing Tomate state file at {}", state_file_path.display());
-          std::fs::remove_file(&state_file_path)?;
-        }
+        let mut state = State::load(config)?;
 
-        let history_file_path = config.history_file_path;
-        if history_file_path.exists() {
-          println!("Removing Tomate history file at {}", history_file_path.display());
-          std::fs::remove_file(&history_file_path)?;
-        }
+        state.purge()?;
       },
     }
 
