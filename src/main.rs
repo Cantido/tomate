@@ -45,6 +45,8 @@ enum Command {
   Clear,
   /// Finish a Pomodoro
   Finish,
+  /// Take a break
+  Break,
   /// Print a list of all logged Pomodoros
   History,
   /// Delete all state and configuration files
@@ -66,10 +68,11 @@ fn duration_parser(input: &str) -> Result<TimeDelta> {
     .with_context(|| format!("Failed to build TimeDelta from input {}", input))
 }
 
-enum Status {
+enum Status<'a> {
   Inactive,
-  Active(TimeDelta),
-  Done,
+  Active(&'a Pomodoro),
+  Done(&'a Pomodoro),
+  ShortBreak(Timer),
 }
 
 struct State {
@@ -104,12 +107,16 @@ impl State {
   fn status(&self) -> Status {
     match &self.current_pomodoro {
       Some(pom) => {
+        if pom.taking_break {
+          return Status::ShortBreak(Timer::new(pom.started_at, pom.duration));
+        }
+
         let time_remaining = pom.time_remaining(Local::now());
 
         if time_remaining > TimeDelta::zero() {
-          Status::Active(time_remaining)
+          Status::Active(pom)
         } else {
-          Status::Done
+          Status::Done(pom)
         }
       },
       None => Status::Inactive
@@ -118,8 +125,7 @@ impl State {
 
   fn print_status(&self, progress: bool) {
     match self.status() {
-      Status::Done => {
-        let pom = self.current_pomodoro.as_ref().unwrap();
+      Status::Done(pom) => {
         if let Some(desc) = &pom.description {
           println!("Current Pomodoro: {}", desc.yellow());
         } else {
@@ -143,8 +149,7 @@ impl State {
         println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
         println!("{}", "(use \"tomate clear\" to delete this Pomodoro)".dimmed());
       },
-      Status::Active(time_remaining) => {
-        let pom = self.current_pomodoro.as_ref().unwrap();
+      Status::Active(pom) => {
         if let Some(desc) = &pom.description {
           println!("Current Pomodoro: {}", desc.yellow());
         } else {
@@ -165,7 +170,7 @@ impl State {
           println!();
           println!();
         } else {
-          println!("Time remaining: {}", wallclock(&time_remaining));
+          println!("Time remaining: {}", wallclock(&pom.time_remaining(Local::now())));
           println!();
         }
         println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
@@ -175,6 +180,20 @@ impl State {
         println!("No current Pomodoro");
         println!();
         println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
+      },
+      Status::ShortBreak(timer) => {
+        println!("Taking a break");
+
+        if progress {
+          self.print_progress_bar();
+          println!();
+          println!();
+        } else {
+          println!("Time remaining: {}", wallclock(&timer.time_remaining(Local::now())));
+          println!();
+        }
+
+        println!("{}", "(use \"tomate finish\" to finish this break)".dimmed());
       },
     }
   }
@@ -209,7 +228,8 @@ impl State {
 
   fn start(&mut self, pomodoro: Pomodoro) -> Result<()> {
     match &self.status() {
-      Status::Done => Err(anyhow!("There is already an unfinished Pomodoro")),
+      Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
+      Status::Done(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Active(_time_remaining) => Err(anyhow!("There is already an unfinished Pomodoro")),
       Status::Inactive => {
         self.current_pomodoro = Some(pomodoro);
@@ -225,21 +245,25 @@ impl State {
   }
 
   fn finish(&mut self) -> Result<()> {
-    if matches!(&self.status(), Status::Inactive) {
-      bail!("No active Pomodoro. Start one with \"tomate start\"");
+    match &self.status() {
+      Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
+      Status::ShortBreak(_timer) => {
+        self.clear()?;
+      },
+      Status::Active(_pom) | Status::Done(_pom) => {
+        let state_file_path = &self.config.state_file_path;
+        let history_file_path = &self.config.history_file_path;
+        let state_str = read_to_string(&state_file_path)?;
+
+        println!("Archiving Pomodoro to {}", &self.config.history_file_path.display().to_string().cyan());
+
+        std::fs::create_dir_all(history_file_path.parent().with_context(|| "History file path does not have a parent directory")?)?;
+        let mut history_file = OpenOptions::new().create(true).write(true).append(true).open(&history_file_path)?;
+        writeln!(history_file, "[[pomodoros]]\n{}", state_str)?;
+
+        self.clear()?;
+      }
     }
-
-    let state_file_path = &self.config.state_file_path;
-    let history_file_path = &self.config.history_file_path;
-    let state_str = read_to_string(&state_file_path)?;
-
-    println!("Archiving Pomodoro to {}", &self.config.history_file_path.display().to_string().cyan());
-
-    std::fs::create_dir_all(history_file_path.parent().with_context(|| "History file path does not have a parent directory")?)?;
-    let mut history_file = OpenOptions::new().create(true).write(true).append(true).open(&history_file_path)?;
-    writeln!(history_file, "[[pomodoros]]\n{}", state_str)?;
-
-    self.clear()?;
 
     Ok(())
   }
@@ -252,6 +276,24 @@ impl State {
       std::fs::remove_file(&self.config.state_file_path)?;
       self.current_pomodoro = None;
     }
+
+    Ok(())
+  }
+
+  fn take_break(&mut self, pomodoro: Pomodoro) -> Result<()> {
+    if matches!(self.status(), Status::ShortBreak(_)) {
+      bail!("You are already taking a break");
+    }
+
+    if !matches!(self.status(), Status::Inactive) {
+      bail!("Finish your current timer before taking a break");
+    }
+
+    println!("Creating Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
+
+    self.current_pomodoro = Some(pomodoro);
+    std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
+    std::fs::write(&self.config.state_file_path, toml::to_string(&self.current_pomodoro)?)?;
 
     Ok(())
   }
@@ -312,7 +354,33 @@ impl State {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct Timer {
+  started_at: DateTime<Local>,
+  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
+  duration: TimeDelta,
+}
+
+impl Timer {
+  pub fn new(started_at: DateTime<Local>, duration: TimeDelta) -> Self {
+    Self {
+      started_at,
+      duration,
+    }
+  }
+
+  pub fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
+    now - self.started_at
+  }
+
+  pub fn time_remaining(&self, now: DateTime<Local>) -> TimeDelta {
+    self.duration - self.time_elapsed(now)
+  }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct Pomodoro {
+  #[serde(default)]
+  taking_break: bool,
   #[serde(rename = "start_time")]
   started_at: DateTime<Local>,
   #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
@@ -326,9 +394,14 @@ impl Pomodoro {
     Self {
       started_at,
       duration,
+      taking_break: false,
       description: None,
       tags: None,
     }
+  }
+
+  pub fn set_break(&mut self) {
+    self.taking_break = true;
   }
 
   pub fn set_description(&mut self, description: &str) {
@@ -451,6 +524,17 @@ fn main() -> Result<()> {
         state.load_state()?;
 
         state.clear()?;
+      },
+      Command::Break => {
+        let mut state = State::new(config);
+        state.load_state()?;
+
+        let duration = TimeDelta::new(5 * 60, 0).unwrap();
+
+        let mut pom = Pomodoro::new(Local::now(), duration);
+        pom.set_break();
+
+        state.take_break(pom)?;
       },
       Command::History => {
         let state = State::new(config);
