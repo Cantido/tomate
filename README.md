@@ -1,0 +1,76 @@
+# Tomate
+
+A Pomodoro timer for the CLI
+
+## Install
+
+Clone this repository and run `cargo install`.
+
+## Usage
+
+To do a Pomodoro:
+
+1. Start a Pomodoro with `tomate start`
+2. See remaining time with `tomate status`
+3. End and archive the Pomodoro with `tomate finish`
+
+To take a break:
+
+1. Start a break with `tomate break`
+2. See remaining time with `tomate status`
+3. End the break with `tomate finish`
+
+### Description and tags
+
+Provide an optional argument to `start` to give the Pomodoro a description.
+You can also add tags with the `--tags` (`-t`) option.
+
+```console
+$ tomate start -t work,fun "Do something cool"
+$ tomate status
+Current Pomodoro: Do something cool
+Status: Active
+Duration: 25m
+Tags:
+        - work
+        - fun
+
+Time remaining: 24:22
+
+(use "tomate finish" to archive this Pomodoro)
+(use "tomate clear" to delete this Pomodoro)
+```
+
+### History
+
+The `tomate history` command shows you all the Pomodoros you've completed.
+
+```console
+$ tomate history
+ Date Started  Duration  Tags         Description
+ 01 Apr 10:23       25m  work         Emails
+ 01 Apr 11:04       25m  home         Phone calls
+ 01 Apr 11:43       25m  work,boring  More stuff
+```
+
+### Hooks
+
+Tomate can run commands when timers start and stop.
+Create an executable script in the hooks directory (by default `${XDG_CONFIG_DIR}/tomate/hooks`)
+called `start`, `stop`, or `break`.
+Tomate will execute these hooks when a Pomodoro starts, a Pomodoro or break stops, and when a break starts, respectively.
+
+## Acknowledgements
+
+Many thanks to Justin Campbell for his [Open Pomodoro](https://github.com/open-pomodoro/openpomodoro-cli) project.
+It's good enough to rewrite it in Rust.
+
+## License
+
+Copyright © 2024 Rosa Richter
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
