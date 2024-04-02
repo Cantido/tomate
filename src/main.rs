@@ -259,6 +259,8 @@ impl Program {
       println!("Deleting current Pomodoro state file {}", &self.config.state_file_path.display().to_string().cyan());
       std::fs::remove_file(&self.config.state_file_path)?;
       self.status = Status::Inactive;
+
+      self.run_stop_hook()?;
     }
 
     Ok(())
@@ -278,6 +280,8 @@ impl Program {
     self.status = Status::ShortBreak(timer);
     std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
     std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
+
+    self.run_break_hook()?;
 
     Ok(())
   }
@@ -345,6 +349,34 @@ impl Program {
       std::process::Command::new(start_hook_path)
         .output()
         .with_context(|| "Failed to execute start hook")?;
+    }
+
+    Ok(())
+  }
+
+  fn run_stop_hook(&self) -> Result<()> {
+    let stop_hook_path = self.config.hooks_directory.join("stop");
+
+    if stop_hook_path.exists() {
+      println!("Executing stop hook at {}", stop_hook_path.display().to_string().cyan());
+
+      std::process::Command::new(stop_hook_path)
+        .output()
+        .with_context(|| "Failed to execute stop hook")?;
+    }
+
+    Ok(())
+  }
+
+  fn run_break_hook(&self) -> Result<()> {
+    let break_hook_path = self.config.hooks_directory.join("break");
+
+    if break_hook_path.exists() {
+      println!("Executing break hook at {}", break_hook_path.display().to_string().cyan());
+
+      std::process::Command::new(break_hook_path)
+        .output()
+        .with_context(|| "Failed to execute break hook")?;
     }
 
     Ok(())
