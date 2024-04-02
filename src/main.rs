@@ -582,7 +582,7 @@ fn main() -> Result<()> {
 
         println!("Creating config file at {}", config_path.display().to_string().cyan());
         println!();
-        std::fs::write(config_path, toml::to_string(&conf)?)?;
+        std::fs::write(&config_path, toml::to_string(&conf)?)?;
 
         conf
       };
@@ -644,6 +644,11 @@ fn main() -> Result<()> {
         let mut state = Program::new(config);
 
         state.purge()?;
+
+        if config_path.exists() {
+          println!("Removing config file at {}", config_path.display().to_string().cyan());
+          std::fs::remove_file(&config_path)?;
+        }
       },
     }
 
