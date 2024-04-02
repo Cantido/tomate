@@ -113,7 +113,7 @@ impl State {
     }
   }
 
-  fn print_status(&self) {
+  fn print_status(&self, progress: bool) {
     match self.status() {
       Status::Done => {
         let pom = self.current_pomodoro.as_ref().unwrap();
@@ -130,7 +130,13 @@ impl State {
             println!("\t- {}", tag.blue());
           }
         }
-        println!("");
+        println!();
+
+        if progress {
+          self.print_progress_bar();
+          println!();
+          println!();
+        }
         println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
         println!("{}", "(use \"tomate clear\" to delete this Pomodoro)".dimmed());
       },
@@ -149,15 +155,22 @@ impl State {
             println!("\t- {}", tag.blue());
           }
         }
-        println!("");
-        println!("Time remaining: {}", wallclock(&time_remaining));
-        println!("");
+        println!();
+
+        if progress {
+          self.print_progress_bar();
+          println!();
+          println!();
+        } else {
+          println!("Time remaining: {}", wallclock(&time_remaining));
+          println!();
+        }
         println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
         println!("{}", "(use \"tomate clear\" to delete this Pomodoro)".dimmed());
       },
       Status::Inactive => {
         println!("No current Pomodoro");
-        println!("");
+        println!();
         println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
       },
     }
@@ -400,11 +413,7 @@ fn main() -> Result<()> {
       Command::Status { progress } => {
         let state = State::load(config)?;
 
-        state.print_status();
-        if *progress {
-          println!();
-          state.print_progress_bar();
-        }
+        state.print_status(*progress);
       },
       Command::Start{ duration, description, tags, progress } => {
         let mut state = State::load(config)?;
