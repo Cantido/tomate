@@ -24,8 +24,8 @@ enum Command {
   /// Start a Pomodoro
   Start {
     /// Length of the Pomodoro to start, in minutes
-    #[arg(short, long, default_value_t = 25)]
-    minutes: u64,
+    #[arg(short, long, value_parser = duration_parser)]
+    duration: TimeDelta,
     /// Description of the task you're focusing on
     description: Option<String>,
     /// Tags to categorize the work you're doing, comma-separated
@@ -40,6 +40,21 @@ enum Command {
   History,
   /// Delete all state and configuration files
   Purge,
+}
+
+fn duration_parser(input: &str) -> Result<TimeDelta> {
+  let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$")?;
+  let caps = re.captures(&input)
+    .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
+
+  let hours: i64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
+  let minutes: i64 = caps.get(2).map_or("0", |c| c.as_str()).parse()?;
+  let seconds: i64 = caps.get(3).map_or("0", |c| c.as_str()).parse()?;
+
+  let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
+
+  TimeDelta::new(total_seconds, 0)
+    .with_context(|| format!("Failed to build TimeDelta from input {}", input))
 }
 
 enum Status {
@@ -347,13 +362,10 @@ fn main() -> Result<()> {
         let state = State::load(config)?;
         state.print_status();
       },
-      Command::Start{ minutes, description, tags } => {
+      Command::Start{ duration, description, tags } => {
         let mut state = State::load(config)?;
 
-        let minutes: i64 = minutes.clone().try_into().unwrap();
-        let dur = TimeDelta::new(minutes * 60, 0).unwrap();
-
-        let mut pom = Pomodoro::new(Local::now(), dur);
+        let mut pom = Pomodoro::new(Local::now(), *duration);
 
         if let Some(desc) = description {
           pom.set_description(desc);
@@ -393,26 +405,40 @@ fn main() -> Result<()> {
 }
 
 fn wallclock(t: &TimeDelta) -> String {
-  let minutes = t.num_minutes();
+  let hours = t.num_hours();
+  let minutes = t.num_minutes() - (hours * 60);
   let seconds = t.num_seconds() - (minutes * 60);
 
-  format!("{:02}:{:02}", minutes, seconds)
+  if hours > 0 {
+    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+  } else {
+    format!("{:02}:{:02}", minutes, seconds)
+  }
 }
 
 fn human_duration(t: &TimeDelta) -> String {
   use std::fmt::Write;
 
-  let minutes = t.num_minutes();
+  if t.is_zero() {
+    return "0s".to_string();
+  }
+
+  let hours = t.num_hours();
+  let minutes = t.num_minutes() - (hours * 60);
   let seconds = t.num_seconds() - (minutes * 60);
 
   let mut acc = String::new();
+
+  if hours > 0 {
+    write!(acc, "{}h", hours).unwrap();
+  }
 
   if minutes > 0 {
     write!(acc, "{}m", minutes).unwrap();
   }
 
   if seconds > 0 {
-    write!(acc, "{}s", minutes).unwrap();
+    write!(acc, "{}s", seconds).unwrap();
   }
 
   acc
