@@ -1,6 +1,7 @@
 mod config;
 mod hooks;
 mod duration;
+mod time;
 
 use std::{
   fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
@@ -169,7 +170,7 @@ impl Program {
         } else {
           println!("Status: {}", "Active".magenta().bold());
         }
-        println!("Duration: {}", human_duration(&pom.duration).cyan());
+        println!("Duration: {}", time::human_duration(&pom.duration).cyan());
         if let Some(tags) = &pom.tags {
           println!("Tags:");
           for tag in tags {
@@ -184,7 +185,7 @@ impl Program {
           println!();
         } else {
           let remaining = pom.time_remaining(Local::now());
-          println!("Time remaining: {}", wallclock(&remaining.max(TimeDelta::zero())));
+          println!("Time remaining: {}", time::wallclock(&remaining.max(TimeDelta::zero())));
           println!();
         }
         println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
@@ -206,7 +207,7 @@ impl Program {
           println!();
         } else {
           let remaining = timer.time_remaining(Local::now());
-          println!("Time remaining: {}", wallclock(&remaining.max(TimeDelta::zero())));
+          println!("Time remaining: {}", time::wallclock(&remaining.max(TimeDelta::zero())));
           println!();
         }
 
@@ -233,7 +234,7 @@ impl Program {
     let unfilled_bar = vec!["░"; unfilled_count].join("");
 
 
-    println!("{} {}{} {}", wallclock(&elapsed), filled_bar, unfilled_bar, wallclock(&remaining));
+    println!("{} {}{} {}", time::wallclock(&elapsed), filled_bar, unfilled_bar, time::wallclock(&remaining));
   }
 
   fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
@@ -347,7 +348,7 @@ impl Program {
 
     for pom in history.pomodoros.iter() {
       let date = pom.started_at.format("%d %b %R").to_string();
-      let dur = human_duration(&pom.duration);
+      let dur = time::human_duration(&pom.duration);
       let tags = pom.tags.clone().unwrap_or(vec!["-".to_string()]).join(",");
       let desc = pom.description.clone().unwrap_or("-".to_string());
 
@@ -457,7 +458,7 @@ impl Pomodoro {
     let output = f
       .replace("%d", &self.description.as_ref().unwrap_or(&"".to_string()))
       .replace("%t", &self.tags.as_ref().unwrap_or(&Vec::<String>::new()).join(","))
-      .replace("%r", &wallclock(&self.time_remaining(now)))
+      .replace("%r", &time::wallclock(&self.time_remaining(now)))
       .replace("%R", &self.time_remaining(now).num_seconds().to_string())
       .replace("%s", &self.started_at.to_rfc3339())
       .replace("%S", &self.started_at.timestamp().to_string())
@@ -565,51 +566,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn wallclock(t: &TimeDelta) -> String {
-  let hours = t.num_hours();
-  let minutes = t.num_minutes() - (hours * 60);
-  let seconds = t.num_seconds() - (minutes * 60);
-
-  if hours > 0 {
-    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
-  } else {
-    format!("{:02}:{:02}", minutes, seconds)
-  }
-}
-
-fn human_duration(t: &TimeDelta) -> String {
-  use std::fmt::Write;
-
-  if t.is_zero() {
-    return "0s".to_string();
-  }
-
-  let hours = t.num_hours();
-  let minutes = t.num_minutes() - (hours * 60);
-  let seconds = t.num_seconds() - (minutes * 60);
-
-  let mut acc = String::new();
-
-  if hours > 0 {
-    write!(acc, "{}h", hours).unwrap();
-  }
-
-  if minutes > 0 {
-    write!(acc, "{}m", minutes).unwrap();
-  }
-
-  if seconds > 0 {
-    write!(acc, "{}s", seconds).unwrap();
-  }
-
-  acc
-}
 
 #[cfg(test)]
 mod test {
     use chrono::{prelude::*, TimeDelta};
 
-    use crate::{wallclock, Pomodoro, Status};
+    use crate::{time::wallclock, Pomodoro, Status};
 
   #[test]
   fn status_to_toml() {
