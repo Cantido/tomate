@@ -16,6 +16,8 @@ use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+use crate::time::TimeDeltaExt;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -170,7 +172,7 @@ impl Program {
         } else {
           println!("Status: {}", "Active".magenta().bold());
         }
-        println!("Duration: {}", time::human_duration(&pom.duration).cyan());
+        println!("Duration: {}", &pom.duration.to_human().cyan());
         if let Some(tags) = &pom.tags {
           println!("Tags:");
           for tag in tags {
@@ -185,7 +187,7 @@ impl Program {
           println!();
         } else {
           let remaining = pom.time_remaining(Local::now());
-          println!("Time remaining: {}", time::wallclock(&remaining.max(TimeDelta::zero())));
+          println!("Time remaining: {}", &remaining.max(TimeDelta::zero()).to_kitchen());
           println!();
         }
         println!("{}", "(use \"tomate finish\" to archive this Pomodoro)".dimmed());
@@ -207,7 +209,7 @@ impl Program {
           println!();
         } else {
           let remaining = timer.time_remaining(Local::now());
-          println!("Time remaining: {}", time::wallclock(&remaining.max(TimeDelta::zero())));
+          println!("Time remaining: {}", &remaining.max(TimeDelta::zero()).to_kitchen());
           println!();
         }
 
@@ -234,7 +236,7 @@ impl Program {
     let unfilled_bar = vec!["░"; unfilled_count].join("");
 
 
-    println!("{} {}{} {}", time::wallclock(&elapsed), filled_bar, unfilled_bar, time::wallclock(&remaining));
+    println!("{} {}{} {}", &elapsed.to_kitchen(), filled_bar, unfilled_bar, &remaining.to_kitchen());
   }
 
   fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
@@ -348,7 +350,7 @@ impl Program {
 
     for pom in history.pomodoros.iter() {
       let date = pom.started_at.format("%d %b %R").to_string();
-      let dur = time::human_duration(&pom.duration);
+      let dur = &pom.duration.to_human();
       let tags = pom.tags.clone().unwrap_or(vec!["-".to_string()]).join(",");
       let desc = pom.description.clone().unwrap_or("-".to_string());
 
@@ -458,7 +460,7 @@ impl Pomodoro {
     let output = f
       .replace("%d", &self.description.as_ref().unwrap_or(&"".to_string()))
       .replace("%t", &self.tags.as_ref().unwrap_or(&Vec::<String>::new()).join(","))
-      .replace("%r", &time::wallclock(&self.time_remaining(now)))
+      .replace("%r", &&self.time_remaining(now).to_kitchen())
       .replace("%R", &self.time_remaining(now).num_seconds().to_string())
       .replace("%s", &self.started_at.to_rfc3339())
       .replace("%S", &self.started_at.timestamp().to_string())
@@ -571,7 +573,7 @@ fn main() -> Result<()> {
 mod test {
     use chrono::{prelude::*, TimeDelta};
 
-    use crate::{time::wallclock, Pomodoro, Status};
+    use crate::{Pomodoro, Status};
 
   #[test]
   fn status_to_toml() {
@@ -629,24 +631,6 @@ mod test {
     let expected_remaining = TimeDelta::new(5 * 60, 0).unwrap();
 
     assert_eq!(pom.time_remaining(dt_later), expected_remaining);
-  }
-
-  #[test]
-  fn wallclock_test() {
-    let dur = TimeDelta::new(25 * 60, 0).unwrap();
-
-    let clock = wallclock(&dur);
-
-    assert_eq!(clock, "25:00");
-  }
-
-  #[test]
-  fn wallclock_seconds_test() {
-    let dur = TimeDelta::new(12, 0).unwrap();
-
-    let clock = wallclock(&dur);
-
-    assert_eq!(clock, "00:12");
   }
 
   #[test]
