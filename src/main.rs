@@ -198,7 +198,7 @@ impl Program {
 
       bar.set_position(elapsed.num_milliseconds().try_into().unwrap());
       bar.set_prefix(wallclock(&elapsed));
-      bar.set_message(wallclock(&remaining));
+      bar.set_message(format!("{} [ETA: {}]", wallclock(&remaining), end_time.format("%r").to_string()));
 
       sleep(Duration::from_millis(66));
 
