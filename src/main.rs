@@ -1,4 +1,6 @@
+mod config;
 mod hooks;
+mod time;
 
 use std::{
   fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
@@ -8,10 +10,10 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use directories::ProjectDirs;
+use config::Config;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -380,7 +382,7 @@ impl Program {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Timer {
   started_at: DateTime<Local>,
-  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
+  #[serde(deserialize_with = "time::from_period_string", serialize_with = "time::to_period_string")]
   duration: TimeDelta,
 }
 
@@ -407,7 +409,7 @@ impl Timer {
 struct Pomodoro {
   #[serde(rename = "start_time")]
   started_at: DateTime<Local>,
-  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
+  #[serde(deserialize_with = "time::from_period_string", serialize_with = "time::to_period_string")]
   duration: TimeDelta,
   description: Option<String>,
   tags: Option<Vec<String>>,
@@ -466,101 +468,11 @@ impl Pomodoro {
   }
 }
 
-fn from_period_string<'de, D>(deserializer: D) -> Result<TimeDelta, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-    let re = Regex::new(r"^PT([0-9]+)S$").unwrap();
-    let cap = re.captures(&s)
-      .with_context(|| "Failed to apply regex to duration string").unwrap()
-      .get(1)
-      .with_context(|| "String does not seem to be a duration string").unwrap()
-      .as_str();
-    let seconds: i64 = cap.parse()
-      .with_context(|| format!("String {} is not an integer", cap)).unwrap();
-
-    Ok(TimeDelta::new(seconds, 0).unwrap())
-}
-
-fn to_period_string<S>(delta: &TimeDelta, serializer: S) -> Result<S::Ok, S::Error>
-where
-  S: Serializer
-{
-  serializer.serialize_str(&delta.to_string())
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct History {
   pomodoros: Vec<Pomodoro>
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-  pub hooks_directory: PathBuf,
-  pub state_file_path: PathBuf,
-  pub history_file_path: PathBuf,
-  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
-  pub pomodoro_duration: TimeDelta,
-  #[serde(deserialize_with = "from_period_string", serialize_with = "to_period_string")]
-  pub short_break_duration: TimeDelta,
-}
-
-impl Config {
-  fn load(path: &PathBuf) -> Result<Option<Self>> {
-    if path.exists() {
-      let config_str = read_to_string(path)?;
-
-      toml::from_str(&config_str)
-        .with_context(|| "Failed to parse config from TOML")
-    } else {
-      Ok(None)
-    }
-  }
-}
-
-impl Default for Config {
-  fn default() -> Self {
-      let project_dirs =
-        ProjectDirs::from("dev", "Cosmicrose", "Tomate")
-        .with_context(|| "Unable to determine XDG directories").unwrap();
-
-      let hooks_directory =
-        project_dirs
-        .config_dir()
-        .join("hooks");
-
-      let state_file_path =
-        project_dirs
-        .state_dir()
-        .with_context(|| "Getting state dir").unwrap()
-        .join("current.toml");
-
-      let history_file_path =
-        project_dirs
-        .data_dir()
-        .join("history.toml");
-
-      Self {
-        hooks_directory,
-        state_file_path,
-        history_file_path,
-        pomodoro_duration: TimeDelta::new(25 * 60, 0).unwrap(),
-        short_break_duration: TimeDelta::new(5 * 60, 0).unwrap(),
-      }
-  }
-}
-
-fn default_config_path() -> Result<PathBuf> {
-  let conf_path =
-    ProjectDirs::from("dev", "Cosmicrose", "Tomate")
-    .with_context(|| "Unable to determine XDG directories")?
-    .config_dir()
-    .join("config.toml");
-
-  Ok(conf_path)
-}
-
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -569,7 +481,7 @@ fn main() -> Result<()> {
       if let Some(conf_path) = args.config {
         conf_path
       } else {
-        default_config_path()?
+        config::default_config_path()?
       };
 
     let config =
