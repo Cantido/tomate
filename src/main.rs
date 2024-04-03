@@ -27,6 +27,9 @@ enum Command {
     /// Show a progress bar and don't exit until the current timer is over
     #[arg(short, long, default_value_t = false)]
     progress: bool,
+    /// Return a custom string as output
+    #[arg(short, long)]
+    format: Option<String>,
   },
   /// Start a Pomodoro
   Start {
@@ -124,9 +127,15 @@ impl Program {
     Ok(())
   }
 
-  fn print_status(&self, progress: bool) {
+  fn print_status(&self, format: Option<String>, progress: bool) {
     match &self.status {
       Status::Active(pom) => {
+        if let Some(format) = format {
+          println!("{}", pom.format(&format, Local::now()));
+
+          return
+        }
+
         if let Some(desc) = &pom.description {
           println!("Current Pomodoro: {}", desc.yellow());
         } else {
@@ -459,6 +468,24 @@ impl Pomodoro {
   fn timer(&self) -> Timer {
     Timer::new(self.started_at, self.duration)
   }
+
+  fn eta(&self) -> DateTime<Local> {
+    self.started_at + self.duration
+  }
+
+  fn format(&self, f: &str, now: DateTime<Local>) -> String {
+    let output = f
+      .replace("%d", &self.description.as_ref().unwrap_or(&"".to_string()))
+      .replace("%t", &self.tags.as_ref().unwrap_or(&Vec::<String>::new()).join(","))
+      .replace("%r", &wallclock(&self.time_remaining(now)))
+      .replace("%R", &self.time_remaining(now).num_seconds().to_string())
+      .replace("%s", &self.started_at.to_rfc3339())
+      .replace("%S", &self.started_at.timestamp().to_string())
+      .replace("%e", &self.eta().to_rfc3339())
+      .replace("%E", &self.eta().timestamp().to_string());
+
+    output
+  }
 }
 
 fn from_period_string<'de, D>(deserializer: D) -> Result<TimeDelta, D::Error>
@@ -582,11 +609,11 @@ fn main() -> Result<()> {
 
 
     match &args.command {
-      Command::Status { progress } => {
+      Command::Status { progress, format } => {
         let mut state = Program::new(config);
         state.load_state()?;
 
-        state.print_status(*progress);
+        state.print_status(format.clone(), *progress);
       },
       Command::Start{ duration, description, tags, progress } => {
         let mut state = Program::new(config);
@@ -768,5 +795,103 @@ mod test {
     let clock = wallclock(&dur);
 
     assert_eq!(clock, "00:12");
+  }
+
+  #[test]
+  fn pomodoro_format_wallclock() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let pom = Pomodoro::new(dt, dur);
+
+    let actual_format = pom.format("%r", dt);
+
+    assert_eq!(actual_format, "25:00");
+  }
+
+  #[test]
+  fn pomodoro_format_description() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let mut pom = Pomodoro::new(dt, dur);
+    pom.set_description("hello :)");
+
+    let actual_format = pom.format("%d", dt);
+
+    assert_eq!(actual_format, "hello :)");
+  }
+
+  #[test]
+  fn pomodoro_format_remaining() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let pom = Pomodoro::new(dt, dur);
+
+    let actual_format = pom.format("%R", dt);
+
+    assert_eq!(actual_format, "1500");
+  }
+
+  #[test]
+  fn pomodoro_format_start_iso() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let pom = Pomodoro::new(dt, dur);
+
+    let actual_format = pom.format("%s", dt);
+
+    assert_eq!(actual_format, "2024-03-27T12:00:00-06:00");
+  }
+
+  #[test]
+  fn pomodoro_format_start_timestamp() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let pom = Pomodoro::new(dt, dur);
+
+    let actual_format = pom.format("%S", dt);
+
+    assert_eq!(actual_format, "1711562400");
+  }
+
+  #[test]
+  fn pomodoro_format_tags() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let mut pom = Pomodoro::new(dt, dur);
+    pom.set_tags(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+    let actual_format = pom.format("%t", dt);
+
+    assert_eq!(actual_format, "a,b,c");
+  }
+
+  #[test]
+  fn pomodoro_format_eta() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let pom = Pomodoro::new(dt, dur);
+
+    let actual_format = pom.format("%e", dt);
+
+    assert_eq!(actual_format, "2024-03-27T12:25:00-06:00");
+  }
+
+  #[test]
+  fn pomodoro_format_eta_timestamp() {
+    let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+    let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+    let pom = Pomodoro::new(dt, dur);
+
+    let actual_format = pom.format("%E", dt);
+
+    assert_eq!(actual_format, "1711563900");
   }
 }
