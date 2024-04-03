@@ -342,8 +342,7 @@ impl Program {
             return Ok(());
         }
 
-        let history_str = read_to_string(&self.config.history_file_path)?;
-        let history: History = toml::from_str(&history_str)?;
+        let history = History::load(&self.config.history_file_path)?;
 
         history.print_std();
 
