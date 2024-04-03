@@ -27,7 +27,25 @@ enum Command {
     /// Show a progress bar and don't exit until the current timer is over
     #[arg(short, long, default_value_t = false)]
     progress: bool,
-    /// Return a custom string as output
+    /// Print a custom-formatted status for the current Pomodoro
+    ///
+    /// Recognizes the following tokens:
+    ///
+    /// %d - description
+    ///
+    /// %t - tags, comma-separated
+    ///
+    /// %r - remaining time, in mm:ss format (or hh:mm:ss if longer than an hour)
+    ///
+    /// %R - remaining time in seconds
+    ///
+    /// %s - start time in RFC 3339 format
+    ///
+    /// %S - start time as a Unix timestamp
+    ///
+    /// %e - end time in RFC 3339 format
+    ///
+    /// %E - end time as a Unix timestamp
     #[arg(short, long)]
     format: Option<String>,
   },
