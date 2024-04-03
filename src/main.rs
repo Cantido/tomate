@@ -1,8 +1,3 @@
-mod config;
-mod hooks;
-mod duration;
-mod time;
-
 use std::{
   fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
 };
@@ -11,13 +6,13 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use config::Config;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use time::Timer;
 
-use crate::time::TimeDeltaExt;
+use tomate::time::{Timer, TimeDeltaExt};
+use tomate::config::{self, Config};
+use tomate::hooks;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
