@@ -1,5 +1,5 @@
 use std::{
-  fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf, thread::sleep, time::Duration
+  fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -7,7 +7,6 @@ use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use directories::ProjectDirs;
-use indicatif::{ProgressBar, ProgressStyle};
 use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -203,7 +202,7 @@ impl Program {
     let unfilled_bar = vec!["░"; unfilled_count].join("");
 
 
-    println!("{} [{}{}] {}", wallclock(&elapsed), filled_bar, unfilled_bar, wallclock(&remaining));
+    println!("{} {}{} {}", wallclock(&elapsed), filled_bar, unfilled_bar, wallclock(&remaining));
   }
 
   fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
