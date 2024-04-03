@@ -22,15 +22,9 @@ where
 
   /// Formats the TimeDelta in a humanized way, for example 22m30s.
   fn to_human(&self) -> String;
-
-  fn num_nanoseconds_expected(&self) -> i64;
 }
 
 impl TimeDeltaExt for TimeDelta {
-  fn num_nanoseconds_expected(&self) -> i64 {
-      self.num_nanoseconds().expect("Expected TimeDelta nanoseconds to be within bounds")
-  }
-
   fn from_iso8601(s: &str) -> Result<Self> {
     let re = Regex::new(r"^PT([0-9]+)S$").unwrap();
     let cap = re.captures(&s)
