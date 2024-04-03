@@ -15,6 +15,7 @@ use config::Config;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use time::Timer;
 
 use crate::time::TimeDeltaExt;
 
@@ -220,12 +221,12 @@ impl Program {
 
   fn print_progress_bar(pom: &Timer) {
     let now = Local::now();
-    let end_time = pom.started_at + pom.duration;
+    let end_time = pom.ends_at();
 
-    let elapsed = (now - pom.started_at).min(pom.duration);
+    let elapsed = (now - pom.starts_at()).min(pom.duration());
     let remaining = (end_time - now).max(TimeDelta::zero());
 
-    let elapsed_ratio = elapsed.num_milliseconds() as f32 / pom.duration.num_milliseconds() as f32;
+    let elapsed_ratio = elapsed.num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
 
     let bar_width = 40.0;
 
@@ -381,32 +382,6 @@ impl Program {
     Ok(())
   }
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Timer {
-  started_at: DateTime<Local>,
-  #[serde(with = "crate::duration")]
-  duration: TimeDelta,
-}
-
-impl Timer {
-  pub fn new(started_at: DateTime<Local>, duration: TimeDelta) -> Self {
-    Self {
-      started_at,
-      duration,
-    }
-  }
-
-  pub fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
-    now - self.started_at
-  }
-
-  pub fn time_remaining(&self, now: DateTime<Local>) -> TimeDelta {
-    self.duration - self.time_elapsed(now)
-  }
-}
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Pomodoro {

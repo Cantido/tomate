@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
-use chrono::TimeDelta;
+use chrono::{DateTime, Local, TimeDelta};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 /// Extensions to `TimeDelta`
 pub trait TimeDeltaExt
@@ -71,6 +72,43 @@ impl TimeDeltaExt for TimeDelta {
     }
 
     acc
+  }
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Timer {
+  started_at: DateTime<Local>,
+  #[serde(with = "crate::duration")]
+  duration: TimeDelta,
+}
+
+impl Timer {
+  pub fn new(started_at: DateTime<Local>, duration: TimeDelta) -> Self {
+    Self {
+      started_at,
+      duration,
+    }
+  }
+
+  pub fn starts_at(&self) -> DateTime<Local> {
+    self.started_at
+  }
+
+  pub fn ends_at(&self) -> DateTime<Local> {
+    self.started_at + self.duration
+  }
+
+  pub fn duration(&self) -> TimeDelta {
+    self.duration
+  }
+
+  pub fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
+    now - self.started_at
+  }
+
+  pub fn time_remaining(&self, now: DateTime<Local>) -> TimeDelta {
+    self.duration - self.time_elapsed(now)
   }
 }
 
