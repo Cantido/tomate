@@ -1,3 +1,5 @@
+mod hooks;
+
 use std::{
   fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
 };
@@ -244,7 +246,7 @@ impl Program {
         std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
         std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
 
-        self.run_start_hook()?;
+        hooks::run_start_hook(&self.config.hooks_directory)?;
 
         let timer = self.status.timer();
 
@@ -289,7 +291,7 @@ impl Program {
       std::fs::remove_file(&self.config.state_file_path)?;
       self.status = Status::Inactive;
 
-      self.run_stop_hook()?;
+      hooks::run_stop_hook(&self.config.hooks_directory)?;
     }
 
     Ok(())
@@ -310,7 +312,7 @@ impl Program {
     std::fs::create_dir_all(&self.config.state_file_path.parent().with_context(|| "State file path does not have a parent directory")?)?;
     std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
 
-    self.run_break_hook()?;
+    hooks::run_break_hook(&self.config.hooks_directory)?;
 
     if show_progress {
       println!();
@@ -369,48 +371,6 @@ impl Program {
     if self.config.history_file_path.exists() {
       println!("Removing history file at {}", self.config.history_file_path.display().to_string().cyan());
       std::fs::remove_file(&self.config.history_file_path)?;
-    }
-
-    Ok(())
-  }
-
-  fn run_start_hook(&self) -> Result<()> {
-    let start_hook_path = self.config.hooks_directory.join("start");
-
-    if start_hook_path.exists() {
-      println!("Executing start hook at {}", start_hook_path.display().to_string().cyan());
-
-      std::process::Command::new(start_hook_path)
-        .output()
-        .with_context(|| "Failed to execute start hook")?;
-    }
-
-    Ok(())
-  }
-
-  fn run_stop_hook(&self) -> Result<()> {
-    let stop_hook_path = self.config.hooks_directory.join("stop");
-
-    if stop_hook_path.exists() {
-      println!("Executing stop hook at {}", stop_hook_path.display().to_string().cyan());
-
-      std::process::Command::new(stop_hook_path)
-        .output()
-        .with_context(|| "Failed to execute stop hook")?;
-    }
-
-    Ok(())
-  }
-
-  fn run_break_hook(&self) -> Result<()> {
-    let break_hook_path = self.config.hooks_directory.join("break");
-
-    if break_hook_path.exists() {
-      println!("Executing break hook at {}", break_hook_path.display().to_string().cyan());
-
-      std::process::Command::new(break_hook_path)
-        .output()
-        .with_context(|| "Failed to execute break hook")?;
     }
 
     Ok(())
