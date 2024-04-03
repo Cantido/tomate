@@ -8,10 +8,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use prettytable::{color, format, Attr, Cell, Row, Table};
-use serde::{Deserialize, Serialize};
 
-use tomate::{config::{self, Config}, Pomodoro};
+use tomate::{config::{self, Config}, Pomodoro, Status};
+use tomate::history::History;
 use tomate::hooks;
 use tomate::time::{TimeDeltaExt, Timer};
 
@@ -86,23 +85,6 @@ enum Command {
     Purge,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "status")]
-enum Status {
-    Inactive,
-    Active(Pomodoro),
-    ShortBreak(Timer),
-}
-
-impl Status {
-    fn timer(&self) -> Option<Timer> {
-        match self {
-            Status::Inactive => None,
-            Status::Active(pom) => Some(pom.timer().clone()),
-            Status::ShortBreak(timer) => Some(timer.clone()),
-        }
-    }
-}
 
 struct Program {
     pub config: Config,
@@ -363,32 +345,7 @@ impl Program {
         let history_str = read_to_string(&self.config.history_file_path)?;
         let history: History = toml::from_str(&history_str)?;
 
-        let mut table = Table::new();
-
-        table.set_titles(Row::new(vec![
-            Cell::new("Date Started").with_style(Attr::Underline(true)),
-            Cell::new("Duration").with_style(Attr::Underline(true)),
-            Cell::new("Tags").with_style(Attr::Underline(true)),
-            Cell::new("Description").with_style(Attr::Underline(true)),
-        ]));
-
-        for pom in history.pomodoros.iter() {
-            let date = pom.timer().starts_at().format("%d %b %R").to_string();
-            let dur = &pom.timer().duration().to_human();
-            let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
-            let desc = pom.description().clone().unwrap_or("-");
-
-            table.add_row(Row::new(vec![
-                Cell::new(&date).with_style(Attr::ForegroundColor(color::BLUE)),
-                Cell::new(&dur)
-                    .style_spec("r")
-                    .with_style(Attr::ForegroundColor(color::CYAN)),
-                Cell::new(&tags),
-                Cell::new(&desc),
-            ]));
-        }
-        table.set_format(*format::consts::FORMAT_CLEAN);
-        table.printstd();
+        history.print_std();
 
         Ok(())
     }
@@ -412,12 +369,6 @@ impl Program {
 
         Ok(())
     }
-}
-
-
-#[derive(Debug, Deserialize, Serialize)]
-struct History {
-    pomodoros: Vec<Pomodoro>,
 }
 
 fn main() -> Result<()> {
@@ -517,27 +468,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use chrono::{prelude::*, TimeDelta};
-
-    use crate::{Pomodoro, Status};
-
-    #[test]
-    fn status_to_toml() {
-        let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
-        let dur = TimeDelta::new(25 * 60, 0).unwrap();
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let status = Status::Active(pom);
-
-        let toml = toml::to_string_pretty(&status).unwrap();
-        let lines: Vec<&str> = toml.lines().collect();
-
-        assert_eq!(lines[0], "status = \"Active\"");
-        assert_eq!(lines[1], "timer = \"2024-03-27T12:00:00-06:00/PT1500S\"");
-    }
 }

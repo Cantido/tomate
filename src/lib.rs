@@ -3,8 +3,27 @@ use serde::{Deserialize, Serialize};
 use time::{Timer, TimeDeltaExt};
 
 pub mod config;
+pub mod history;
 pub mod hooks;
 pub mod time;
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "status")]
+pub enum Status {
+    Inactive,
+    Active(Pomodoro),
+    ShortBreak(Timer),
+}
+
+impl Status {
+    pub fn timer(&self) -> Option<Timer> {
+        match self {
+            Status::Inactive => None,
+            Status::Active(pom) => Some(pom.timer().clone()),
+            Status::ShortBreak(timer) => Some(timer.clone()),
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Pomodoro {
@@ -65,12 +84,27 @@ impl Pomodoro {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use chrono::{prelude::*, TimeDelta};
 
-    use crate::Pomodoro;
+    use crate::{Pomodoro, Status};
+
+    #[test]
+    fn status_to_toml() {
+        let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+        let dur = TimeDelta::new(25 * 60, 0).unwrap();
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let status = Status::Active(pom);
+
+        let toml = toml::to_string_pretty(&status).unwrap();
+        let lines: Vec<&str> = toml.lines().collect();
+
+        assert_eq!(lines[0], "status = \"Active\"");
+        assert_eq!(lines[1], "timer = \"2024-03-27T12:00:00-06:00/PT1500S\"");
+    }
 
     #[test]
     fn toml_to_pom() {
