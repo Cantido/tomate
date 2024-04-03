@@ -3,7 +3,7 @@ pub mod duration;
 use std::{fmt::Display, str::FromStr};
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Local, TimeDelta};
+use chrono::{prelude::*, TimeDelta};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
