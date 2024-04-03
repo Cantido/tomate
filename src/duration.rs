@@ -3,7 +3,7 @@ use chrono::TimeDelta;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serializer};
 
-pub fn from_period_string<'de, D>(deserializer: D) -> Result<TimeDelta, D::Error>
+pub fn deserialize<'de, D>(deserializer: D) -> Result<TimeDelta, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -20,7 +20,7 @@ where
     Ok(TimeDelta::new(seconds, 0).unwrap())
 }
 
-pub fn to_period_string<S>(delta: &TimeDelta, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize<S>(delta: &TimeDelta, serializer: S) -> Result<S::Ok, S::Error>
 where
   S: Serializer
 {

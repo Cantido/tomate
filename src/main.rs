@@ -1,6 +1,6 @@
 mod config;
 mod hooks;
-mod time;
+mod duration;
 
 use std::{
   fs::{read_to_string, OpenOptions}, io::prelude::*, path::PathBuf
@@ -382,7 +382,7 @@ impl Program {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Timer {
   started_at: DateTime<Local>,
-  #[serde(deserialize_with = "time::from_period_string", serialize_with = "time::to_period_string")]
+  #[serde(with = "crate::duration")]
   duration: TimeDelta,
 }
 
@@ -409,7 +409,7 @@ impl Timer {
 struct Pomodoro {
   #[serde(rename = "start_time")]
   started_at: DateTime<Local>,
-  #[serde(deserialize_with = "time::from_period_string", serialize_with = "time::to_period_string")]
+  #[serde(with = "crate::duration")]
   duration: TimeDelta,
   description: Option<String>,
   tags: Option<Vec<String>>,

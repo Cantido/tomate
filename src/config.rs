@@ -11,9 +11,9 @@ pub struct Config {
   pub hooks_directory: PathBuf,
   pub state_file_path: PathBuf,
   pub history_file_path: PathBuf,
-  #[serde(deserialize_with = "crate::time::from_period_string", serialize_with = "crate::time::to_period_string")]
+  #[serde(with = "crate::duration")]
   pub pomodoro_duration: TimeDelta,
-  #[serde(deserialize_with = "crate::time::from_period_string", serialize_with = "crate::time::to_period_string")]
+  #[serde(with = "crate::duration")]
   pub short_break_duration: TimeDelta,
 }
 
