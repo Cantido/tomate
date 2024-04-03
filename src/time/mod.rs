@@ -15,6 +15,9 @@ where
   /// Parse a `TimeDelta` from an ISO 8601 string, for example "PT1500S".
   fn from_iso8601(s: &str) -> Result<Self>;
 
+  /// Parse a `TimeDelta` from a humanized string, for example "22m30s".
+  fn from_human(s: &str) -> Result<Self>;
+
   /// Formats the TimeDelta as a "kitchen timer" string, e.g. mm:ss.
   ///
   /// If the delta is longer than an hour, the delta is formatted as hh:mm:ss.
@@ -77,6 +80,21 @@ impl TimeDeltaExt for TimeDelta {
 
     acc
   }
+
+    fn from_human(input: &str) -> Result<TimeDelta> {
+      let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$").unwrap();
+      let caps = re.captures(&input)
+        .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
+
+      let hours: i64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
+      let minutes: i64 = caps.get(2).map_or("0", |c| c.as_str()).parse()?;
+      let seconds: i64 = caps.get(3).map_or("0", |c| c.as_str()).parse()?;
+
+      let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
+
+      TimeDelta::new(total_seconds, 0)
+        .with_context(|| format!("Failed to build TimeDelta from input {}", input))
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

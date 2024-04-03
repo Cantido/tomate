@@ -7,7 +7,6 @@ use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use prettytable::{color, format, Attr, Cell, Row, Table};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use tomate::time::{Timer, TimeDeltaExt};
@@ -55,7 +54,7 @@ enum Command {
   /// Start a Pomodoro
   Start {
     /// Length of the Pomodoro to start
-    #[arg(short, long, value_parser = duration_parser)]
+    #[arg(short, long, value_parser = TimeDelta::from_human)]
     duration: Option<TimeDelta>,
     /// Description of the task you're focusing on
     description: Option<String>,
@@ -73,7 +72,7 @@ enum Command {
   /// Take a break
   Break {
     /// Length of the break to start
-    #[arg(short, long, value_parser = duration_parser)]
+    #[arg(short, long, value_parser = TimeDelta::from_human)]
     duration: Option<TimeDelta>,
     /// Show a progress bar and don't exit until the current timer is over
     #[arg(short, long, default_value_t = false)]
@@ -84,22 +83,6 @@ enum Command {
   /// Delete all state and configuration files
   Purge,
 }
-
-fn duration_parser(input: &str) -> Result<TimeDelta> {
-  let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$").unwrap();
-  let caps = re.captures(&input)
-    .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
-
-  let hours: i64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
-  let minutes: i64 = caps.get(2).map_or("0", |c| c.as_str()).parse()?;
-  let seconds: i64 = caps.get(3).map_or("0", |c| c.as_str()).parse()?;
-
-  let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
-
-  TimeDelta::new(total_seconds, 0)
-    .with_context(|| format!("Failed to build TimeDelta from input {}", input))
-}
-
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "status")]
