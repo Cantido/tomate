@@ -1,3 +1,5 @@
+use std::{fmt::Display, str::FromStr};
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, TimeDelta};
 use regex::Regex;
@@ -77,6 +79,7 @@ impl TimeDeltaExt for TimeDelta {
 
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct Timer {
   started_at: DateTime<Local>,
   #[serde(with = "crate::duration")]
@@ -103,12 +106,51 @@ impl Timer {
     self.duration
   }
 
-  pub fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
-    now - self.started_at
+  pub fn elapsed(&self, now: DateTime<Local>) -> TimeDelta {
+    (now - self.started_at)
+      .clamp(TimeDelta::zero(), self.duration)
   }
 
-  pub fn time_remaining(&self, now: DateTime<Local>) -> TimeDelta {
-    self.duration - self.time_elapsed(now)
+  pub fn remaining(&self, now: DateTime<Local>) -> TimeDelta {
+    (self.duration - self.elapsed(now))
+      .clamp(TimeDelta::zero(), self.duration)
+  }
+
+  pub fn done(&self, now: DateTime<Local>) -> bool {
+    now > self.ends_at()
+  }
+}
+
+impl TryFrom<String> for Timer {
+  type Error = anyhow::Error;
+
+  fn try_from(value: String) -> std::prelude::v1::Result<Self, Self::Error> {
+      value.parse()
+  }
+}
+
+impl Into<String> for Timer {
+  fn into(self) -> String {
+      self.to_string()
+  }
+}
+
+impl FromStr for Timer {
+  type Err = anyhow::Error;
+
+  fn from_str(s: &str) -> std::prelude::v1::Result<Self, Self::Err> {
+    let mut parts = s.splitn(2, "/");
+
+    let dt: DateTime<Local> = parts.next().with_context(|| "Duration string didn't have a first part")?.parse()?;
+    let dur: TimeDelta = TimeDelta::from_iso8601(parts.next().with_context(|| "Duration string didn't have a second part")?)?;
+
+    Ok(Self::new(dt, dur))
+  }
+}
+
+impl Display for Timer {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      write!(f, "{}/{}", self.started_at.to_rfc3339(), self.duration)
   }
 }
 

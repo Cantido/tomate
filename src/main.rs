@@ -118,7 +118,7 @@ impl Status {
   fn timer(&self) -> Option<Timer> {
     match self {
       Status::Inactive => None,
-      Status::Active(pom) => Some(pom.timer()),
+      Status::Active(pom) => Some(pom.timer.clone()),
       Status::ShortBreak(timer) => Some(timer.clone()),
     }
   }
@@ -168,12 +168,12 @@ impl Program {
           println!("Current Pomodoro");
         }
 
-        if pom.done(Local::now()) {
+        if pom.timer.done(Local::now()) {
           println!("Status: {}", "Done".red().bold());
         } else {
           println!("Status: {}", "Active".magenta().bold());
         }
-        println!("Duration: {}", &pom.duration.to_human().cyan());
+        println!("Duration: {}", &pom.timer.duration().to_human().cyan());
         if let Some(tags) = &pom.tags {
           println!("Tags:");
           for tag in tags {
@@ -183,11 +183,11 @@ impl Program {
         println!();
 
         if progress {
-          Self::print_progress_bar(&pom.timer());
+          Self::print_progress_bar(&pom.timer);
           println!();
           println!();
         } else {
-          let remaining = pom.time_remaining(Local::now());
+          let remaining = pom.timer.remaining(Local::now());
           println!("Time remaining: {}", &remaining.max(TimeDelta::zero()).to_kitchen());
           println!();
         }
@@ -209,7 +209,7 @@ impl Program {
           println!();
           println!();
         } else {
-          let remaining = timer.time_remaining(Local::now());
+          let remaining = timer.remaining(Local::now());
           println!("Time remaining: {}", &remaining.max(TimeDelta::zero()).to_kitchen());
           println!();
         }
@@ -221,12 +221,7 @@ impl Program {
 
   fn print_progress_bar(pom: &Timer) {
     let now = Local::now();
-    let end_time = pom.ends_at();
-
-    let elapsed = (now - pom.starts_at()).min(pom.duration());
-    let remaining = (end_time - now).max(TimeDelta::zero());
-
-    let elapsed_ratio = elapsed.num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
+    let elapsed_ratio = pom.elapsed(now).num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
 
     let bar_width = 40.0;
 
@@ -237,7 +232,7 @@ impl Program {
     let unfilled_bar = vec!["░"; unfilled_count].join("");
 
 
-    println!("{} {}{} {}", &elapsed.to_kitchen(), filled_bar, unfilled_bar, &remaining.to_kitchen());
+    println!("{} {}{} {}", &pom.elapsed(now).to_kitchen(), filled_bar, unfilled_bar, &pom.remaining(now).to_kitchen());
   }
 
   fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
@@ -350,8 +345,8 @@ impl Program {
     ]));
 
     for pom in history.pomodoros.iter() {
-      let date = pom.started_at.format("%d %b %R").to_string();
-      let dur = &pom.duration.to_human();
+      let date = pom.timer.starts_at().format("%d %b %R").to_string();
+      let dur = &pom.timer.duration().to_human();
       let tags = pom.tags.clone().unwrap_or(vec!["-".to_string()]).join(",");
       let desc = pom.description.clone().unwrap_or("-".to_string());
 
@@ -385,19 +380,16 @@ impl Program {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Pomodoro {
-  #[serde(rename = "start_time")]
-  started_at: DateTime<Local>,
-  #[serde(with = "crate::duration")]
-  duration: TimeDelta,
+  timer: Timer,
   description: Option<String>,
   tags: Option<Vec<String>>,
 }
 
 impl Pomodoro {
-  fn new(started_at: DateTime<Local>, duration: TimeDelta) -> Self {
+  fn new(starts_at: DateTime<Local>, duration: TimeDelta) -> Self {
+    let timer = Timer::new(starts_at, duration);
     Self {
-      started_at,
-      duration,
+      timer,
       description: None,
       tags: None,
     }
@@ -411,36 +403,16 @@ impl Pomodoro {
     self.tags = Some(tags);
   }
 
-  fn done(&self, now: DateTime<Local>) -> bool {
-    now >= (self.started_at + self.duration)
-  }
-
-  fn time_elapsed(&self, now: DateTime<Local>) -> TimeDelta {
-    now - self.started_at
-  }
-
-  fn time_remaining(&self, now: DateTime<Local>) -> TimeDelta {
-    self.duration - self.time_elapsed(now)
-  }
-
-  fn timer(&self) -> Timer {
-    Timer::new(self.started_at, self.duration)
-  }
-
-  fn eta(&self) -> DateTime<Local> {
-    self.started_at + self.duration
-  }
-
   fn format(&self, f: &str, now: DateTime<Local>) -> String {
     let output = f
       .replace("%d", &self.description.as_ref().unwrap_or(&"".to_string()))
       .replace("%t", &self.tags.as_ref().unwrap_or(&Vec::<String>::new()).join(","))
-      .replace("%r", &&self.time_remaining(now).to_kitchen())
-      .replace("%R", &self.time_remaining(now).num_seconds().to_string())
-      .replace("%s", &self.started_at.to_rfc3339())
-      .replace("%S", &self.started_at.timestamp().to_string())
-      .replace("%e", &self.eta().to_rfc3339())
-      .replace("%E", &self.eta().timestamp().to_string());
+      .replace("%r", &self.timer.remaining(now).to_kitchen())
+      .replace("%R", &self.timer.remaining(now).num_seconds().to_string())
+      .replace("%s", &self.timer.starts_at().to_rfc3339())
+      .replace("%S", &self.timer.starts_at().timestamp().to_string())
+      .replace("%e", &self.timer.ends_at().to_rfc3339())
+      .replace("%E", &self.timer.ends_at().timestamp().to_string());
 
     output
   }
@@ -563,22 +535,20 @@ mod test {
     let lines: Vec<&str> = toml.lines().collect();
 
     assert_eq!(lines[0], "status = \"Active\"");
-    assert_eq!(lines[1], "start_time = \"2024-03-27T12:00:00-06:00\"");
-    assert_eq!(lines[2], "duration = \"PT1500S\"");
+    assert_eq!(lines[1], "timer = \"2024-03-27T12:00:00-06:00/PT1500S\"");
   }
 
   #[test]
   fn toml_to_pom() {
     let pom: Pomodoro = toml::from_str(r#"
-      start_time = "2024-03-27T12:00:00-06:00"
-      duration = "PT1500S"
+      timer = "2024-03-27T12:00:00-06:00/PT1500S"
     "#).expect("Could not parse pomodoro from string");
 
     let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
     let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
-    assert_eq!(pom.started_at, dt);
-    assert_eq!(pom.duration, dur);
+    assert_eq!(pom.timer.starts_at(), dt);
+    assert_eq!(pom.timer.duration(), dur);
   }
 
   #[test]
@@ -591,7 +561,7 @@ mod test {
 
     let expected_elapsed = TimeDelta::new(20 * 60, 0).unwrap();
 
-    assert_eq!(pom.time_elapsed(dt_later), expected_elapsed);
+    assert_eq!(pom.timer.elapsed(dt_later), expected_elapsed);
   }
 
 
@@ -605,7 +575,7 @@ mod test {
 
     let expected_remaining = TimeDelta::new(5 * 60, 0).unwrap();
 
-    assert_eq!(pom.time_remaining(dt_later), expected_remaining);
+    assert_eq!(pom.timer.remaining(dt_later), expected_remaining);
   }
 
   #[test]
