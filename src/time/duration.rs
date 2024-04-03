@@ -13,7 +13,7 @@ where
 
 pub fn serialize<S>(delta: &TimeDelta, serializer: S) -> Result<S::Ok, S::Error>
 where
-  S: Serializer
+    S: Serializer,
 {
-  serializer.serialize_str(&delta.to_string())
+    serializer.serialize_str(&delta.to_string())
 }
