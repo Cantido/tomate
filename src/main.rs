@@ -186,30 +186,24 @@ impl Program {
   }
 
   fn print_progress_bar(pom: &Timer) {
-    let mut now = Local::now();
+    let now = Local::now();
     let end_time = pom.started_at + pom.duration;
 
-    let bar = ProgressBar::new(pom.duration.num_milliseconds().try_into().unwrap());
-    bar.set_style(ProgressStyle::with_template("{prefix} {bar:40.blue} {msg}").unwrap());
+    let elapsed = (now - pom.started_at).min(pom.duration);
+    let remaining = (end_time - now).max(TimeDelta::zero());
 
-    loop {
-      let elapsed = (now - pom.started_at).min(pom.duration);
-      let remaining = (end_time - now).max(TimeDelta::zero());
+    let elapsed_ratio = elapsed.num_milliseconds() as f32 / pom.duration.num_milliseconds() as f32;
 
-      bar.set_position(elapsed.num_milliseconds().try_into().unwrap());
-      bar.set_prefix(wallclock(&elapsed));
-      bar.set_message(format!("{} [ETA: {}]", wallclock(&remaining), end_time.format("%r").to_string()));
+    let bar_width = 40.0;
 
-      sleep(Duration::from_millis(66));
+    let filled_count = (bar_width * elapsed_ratio).round() as usize;
+    let unfilled_count = (bar_width * (1.0 - elapsed_ratio)).round() as usize;
 
-      now = Local::now();
+    let filled_bar = vec!["█"; filled_count].join("");
+    let unfilled_bar = vec!["░"; unfilled_count].join("");
 
-      if now > end_time {
-        break;
-      }
-    }
 
-    bar.finish();
+    println!("{} [{}{}] {}", wallclock(&elapsed), filled_bar, unfilled_bar, wallclock(&remaining));
   }
 
   fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
