@@ -15,6 +15,8 @@ pub struct Config {
     pub pomodoro_duration: TimeDelta,
     #[serde(with = "crate::time::duration")]
     pub short_break_duration: TimeDelta,
+    #[serde(with = "crate::time::duration")]
+    pub long_break_duration: TimeDelta,
 }
 
 impl Config {
@@ -28,7 +30,6 @@ impl Config {
                 "Creating config file at {}",
                 config_path.display().to_string().cyan()
             );
-            println!();
             std::fs::write(&config_path, toml::to_string(&conf)?)?;
 
             Ok(conf)
@@ -68,6 +69,7 @@ impl Default for Config {
             history_file_path,
             pomodoro_duration: TimeDelta::new(25 * 60, 0).unwrap(),
             short_break_duration: TimeDelta::new(5 * 60, 0).unwrap(),
+            long_break_duration: TimeDelta::new(30 * 60, 0).unwrap(),
         }
     }
 }

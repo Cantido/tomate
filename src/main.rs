@@ -65,6 +65,9 @@ enum Command {
         /// Length of the break to start
         #[arg(short, long, value_parser = TimeDelta::from_human)]
         duration: Option<TimeDelta>,
+        /// Take a long break instead of a short break
+        #[arg(short, long, default_value_t = false)]
+        long: bool,
     },
     /// Print a list of all logged Pomodoros
     History,
@@ -119,11 +122,22 @@ fn main() -> Result<()> {
         Command::Clear => {
             tomate::clear(&config)?;
         }
-        Command::Break { duration } => {
-            let dur = duration.unwrap_or(config.short_break_duration);
-            let timer = Timer::new(Local::now(), dur);
+        Command::Break { duration, long } => {
 
-            tomate::take_break(&config, timer.clone())?;
+            let timer = if *long {
+                let dur = duration.unwrap_or(config.long_break_duration);
+                let timer = Timer::new(Local::now(), dur);
+
+                tomate::take_long_break(&config, timer.clone())?;
+                timer
+            } else {
+                let dur = duration.unwrap_or(config.short_break_duration);
+                let timer = Timer::new(Local::now(), dur);
+
+                tomate::take_short_break(&config, timer.clone())?;
+
+                timer
+            };
 
             println!();
             print_progress_bar(&timer);
@@ -228,7 +242,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
             println!("{}", "(use \"tomate break\" to take a break)".dimmed());
         }
         Status::ShortBreak(timer) => {
-            println!("Taking a break");
+            println!("Taking a short break");
             println!();
 
             print_progress_bar(&timer);
@@ -238,7 +252,19 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
                 "{}",
                 "(use \"tomate finish\" to finish this break)".dimmed()
             );
-        }
+        },
+        Status::LongBreak(timer) => {
+            println!("Taking a long break");
+            println!();
+
+            print_progress_bar(&timer);
+            println!();
+
+            println!(
+                "{}",
+                "(use \"tomate finish\" to finish this break)".dimmed()
+            );
+        },
     }
 
     Ok(())

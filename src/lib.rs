@@ -20,6 +20,7 @@ pub enum Status {
     Inactive,
     Active(Pomodoro),
     ShortBreak(Timer),
+    LongBreak(Timer),
 }
 
 impl Status {
@@ -71,6 +72,7 @@ impl Status {
             Status::Inactive => None,
             Status::Active(pom) => Some(pom.timer().clone()),
             Status::ShortBreak(timer) => Some(timer.clone()),
+            Status::LongBreak(timer) => Some(timer.clone()),
         }
     }
 }
@@ -139,6 +141,7 @@ pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
 
     match status {
         Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
+        Status::LongBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
         Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
         Status::Inactive => {
             let next_status = Status::Active(pomodoro);
@@ -151,23 +154,40 @@ pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
     }
 }
 
-pub fn take_break(config: &Config, timer: Timer) -> Result<()> {
+pub fn take_short_break(config: &Config, timer: Timer) -> Result<()> {
     let status = Status::load(&config.state_file_path)?;
 
-    if matches!(status, Status::ShortBreak(_)) {
-        bail!("You are already taking a break");
+    match status {
+        Status::Active(_) => Err(anyhow!("Finish your current timer before taking a break")),
+        Status::ShortBreak(_) => Err(anyhow!("You are already taking a break")),
+        Status::LongBreak(_) => Err(anyhow!("You are already taking a break")),
+        Status::Inactive => {
+            let new_status = Status::ShortBreak(timer.clone());
+            new_status.save(&config.state_file_path)?;
+
+            hooks::run_break_hook(&config.hooks_directory)?;
+
+            Ok(())
+        }
     }
+}
 
-    if !matches!(status, Status::Inactive) {
-        bail!("Finish your current timer before taking a break");
+pub fn take_long_break(config: &Config, timer: Timer) -> Result<()> {
+    let status = Status::load(&config.state_file_path)?;
+
+    match status {
+        Status::Active(_) => Err(anyhow!("Finish your current timer before taking a break")),
+        Status::ShortBreak(_) => Err(anyhow!("You are already taking a break")),
+        Status::LongBreak(_) => Err(anyhow!("You are already taking a break")),
+        Status::Inactive => {
+            let new_status = Status::ShortBreak(timer.clone());
+            new_status.save(&config.state_file_path)?;
+
+            hooks::run_break_hook(&config.hooks_directory)?;
+
+            Ok(())
+        }
     }
-
-    let new_status = Status::ShortBreak(timer.clone());
-    new_status.save(&config.state_file_path)?;
-
-    hooks::run_break_hook(&config.hooks_directory)?;
-
-    Ok(())
 }
 
 pub fn default_config_path() -> Result<PathBuf> {
@@ -184,9 +204,8 @@ pub fn finish(config: &Config) -> Result<()> {
 
     match status {
         Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
-        Status::ShortBreak(_timer) => {
-            clear(config)?;
-        }
+        Status::ShortBreak(_timer) => clear(config)?,
+        Status::LongBreak(_timer) => clear(config)?,
         Status::Active(pom) => {
             History::append(&pom, &config.history_file_path)?;
 
