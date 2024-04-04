@@ -1,4 +1,8 @@
+use std::{fs::read_to_string, path::PathBuf};
+
+use anyhow::{Context, Result};
 use chrono::{prelude::*, TimeDelta};
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use time::{Timer, TimeDeltaExt};
 
@@ -16,6 +20,49 @@ pub enum Status {
 }
 
 impl Status {
+    pub fn load(state_file_path: &PathBuf) -> Result<Self> {
+        if state_file_path.try_exists()? {
+            let state_str = read_to_string(state_file_path)
+                .with_context(|| "Failed to read state file")?;
+            toml::from_str(&state_str)
+                .with_context(|| "Failed to parse state file")
+        } else {
+            Ok(Self::Inactive)
+        }
+    }
+
+    pub fn save(&self, state_file_path: &PathBuf) -> Result<()> {
+        match &self {
+            Self::Inactive => {
+                println!(
+                    "Deleting current Pomodoro state file {}",
+                    &state_file_path.display().to_string().cyan()
+                );
+                std::fs::remove_file(&state_file_path)?;
+                Ok(())
+            },
+            _ => {
+                if !state_file_path.try_exists()? {
+                    println!(
+                        "Creating Pomodoro state file {}",
+                        &state_file_path.display().to_string().cyan()
+                    );
+                }
+
+                let state_file_dir = state_file_path.parent()
+                        .with_context(|| "State file path does not have a parent directory")?;
+                std::fs::create_dir_all(state_file_dir)
+                    .with_context(|| "Failed to create directory for state file")?;
+
+                let contents = toml::to_string(&self)?;
+
+                std::fs::write(&state_file_path, contents)?;
+
+                Ok(())
+            },
+        }
+    }
+
     pub fn timer(&self) -> Option<Timer> {
         match self {
             Status::Inactive => None,
@@ -25,7 +72,7 @@ impl Status {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pomodoro {
     timer: Timer,
     description: Option<String>,

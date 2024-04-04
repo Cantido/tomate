@@ -1,10 +1,6 @@
-use std::{
-    fs::{read_to_string, OpenOptions},
-    io::prelude::*,
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -103,10 +99,7 @@ impl Program {
         let state_file_path = &self.config.state_file_path;
 
         self.status = if let Ok(true) = state_file_path.try_exists() {
-            let state_str = read_to_string(state_file_path)?;
-            let status: Status = toml::from_str(&state_str)?;
-
-            status
+            Status::load(state_file_path)?
         } else {
             Status::Inactive
         };
@@ -223,20 +216,7 @@ impl Program {
             Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
             Status::Inactive => {
                 self.status = Status::Active(pomodoro);
-
-                println!(
-                    "Creating Pomodoro state file {}",
-                    &self.config.state_file_path.display().to_string().cyan()
-                );
-
-                std::fs::create_dir_all(
-                    &self
-                        .config
-                        .state_file_path
-                        .parent()
-                        .with_context(|| "State file path does not have a parent directory")?,
-                )?;
-                std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
+                self.status.save(&self.config.state_file_path)?;
 
                 hooks::run_start_hook(&self.config.hooks_directory)?;
 
@@ -259,25 +239,7 @@ impl Program {
                 self.clear()?;
             }
             Status::Active(pom) => {
-                let history_file_path = &self.config.history_file_path;
-                let pom_str = toml::to_string(&pom)?;
-
-                println!(
-                    "Archiving Pomodoro to {}",
-                    &self.config.history_file_path.display().to_string().cyan()
-                );
-
-                std::fs::create_dir_all(
-                    history_file_path
-                        .parent()
-                        .with_context(|| "History file path does not have a parent directory")?,
-                )?;
-                let mut history_file = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .append(true)
-                    .open(&history_file_path)?;
-                writeln!(history_file, "[[pomodoros]]\n{}", pom_str)?;
+                History::append(&pom, &self.config.history_file_path)?;
 
                 self.clear()?;
             }
@@ -312,20 +274,8 @@ impl Program {
             bail!("Finish your current timer before taking a break");
         }
 
-        println!(
-            "Creating Pomodoro state file {}",
-            &self.config.state_file_path.display().to_string().cyan()
-        );
-
         self.status = Status::ShortBreak(timer.clone());
-        std::fs::create_dir_all(
-            &self
-                .config
-                .state_file_path
-                .parent()
-                .with_context(|| "State file path does not have a parent directory")?,
-        )?;
-        std::fs::write(&self.config.state_file_path, toml::to_string(&self.status)?)?;
+        self.status.save(&self.config.state_file_path)?;
 
         hooks::run_break_hook(&self.config.hooks_directory)?;
 
