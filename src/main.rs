@@ -329,20 +329,7 @@ fn main() -> Result<()> {
         config::default_config_path()?
     };
 
-    let config = if let Some(conf) = Config::load(&config_path)? {
-        conf
-    } else {
-        let conf = Config::default();
-
-        println!(
-            "Creating config file at {}",
-            config_path.display().to_string().cyan()
-        );
-        println!();
-        std::fs::write(&config_path, toml::to_string(&conf)?)?;
-
-        conf
-    };
+    let config = Config::init(&config_path)?;
 
     match &args.command {
         Command::Status { progress, format } => {

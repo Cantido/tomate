@@ -3,6 +3,7 @@ use std::{fs::read_to_string, path::PathBuf};
 use anyhow::{Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use colored::Colorize;
+use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use time::{Timer, TimeDeltaExt};
 
@@ -129,6 +130,15 @@ impl Pomodoro {
 
         output
     }
+}
+
+pub fn default_config_path() -> Result<PathBuf> {
+    let conf_path = ProjectDirs::from("dev", "Cosmicrose", "Tomate")
+        .with_context(|| "Unable to determine XDG directories")?
+        .config_dir()
+        .join("config.toml");
+
+    Ok(conf_path)
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 use std::{fs::read_to_string, path::PathBuf};
 
 use anyhow::{Context, Result};
+use colored::Colorize;
 use chrono::TimeDelta;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,24 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(path: &PathBuf) -> Result<Option<Self>> {
+    pub fn init(config_path: &PathBuf) -> Result<Self> {
+        if let Some(conf) = Config::load(&config_path)? {
+            Ok(conf)
+        } else {
+            let conf = Config::default();
+
+            println!(
+                "Creating config file at {}",
+                config_path.display().to_string().cyan()
+            );
+            println!();
+            std::fs::write(&config_path, toml::to_string(&conf)?)?;
+
+            Ok(conf)
+        }
+    }
+
+    fn load(path: &PathBuf) -> Result<Option<Self>> {
         if path.exists() {
             let config_str = read_to_string(path)?;
 
@@ -62,3 +80,4 @@ pub fn default_config_path() -> Result<PathBuf> {
 
     Ok(conf_path)
 }
+
