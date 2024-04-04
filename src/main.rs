@@ -84,36 +84,34 @@ enum Command {
 
 struct Program {
     pub config: Config,
-    status: Status,
 }
 
 impl Program {
     fn new(config: Config) -> Self {
         Self {
-            config,
-            status: Status::Inactive,
+            config
         }
     }
 
-    fn load_state(&mut self) -> Result<()> {
+    fn load_state(&self) -> Result<Status> {
         let state_file_path = &self.config.state_file_path;
 
-        self.status = if let Ok(true) = state_file_path.try_exists() {
-            Status::load(state_file_path)?
+        if let Ok(true) = state_file_path.try_exists() {
+            Ok(Status::load(state_file_path)?)
         } else {
-            Status::Inactive
-        };
-
-        Ok(())
+            Ok(Status::Inactive)
+        }
     }
 
-    fn print_status(&self, format: Option<String>, progress: bool) {
-        match &self.status {
+    fn print_status(&self, format: Option<String>, progress: bool) -> Result<()> {
+        let status = self.load_state()?;
+
+        match status {
             Status::Active(pom) => {
                 if let Some(format) = format {
                     println!("{}", pom.format(&format, Local::now()));
 
-                    return;
+                    return Ok(());
                 }
 
                 if let Some(desc) = pom.description() {
@@ -186,6 +184,8 @@ impl Program {
                 );
             }
         }
+
+        Ok(())
     }
 
     fn print_progress_bar(pom: &Timer) {
@@ -211,16 +211,16 @@ impl Program {
     }
 
     fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
-        match &self.status {
+        match self.load_state()? {
             Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
             Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
             Status::Inactive => {
-                self.status = Status::Active(pomodoro);
-                self.status.save(&self.config.state_file_path)?;
+                let next_status = Status::Active(pomodoro);
+                next_status.save(&self.config.state_file_path)?;
 
                 hooks::run_start_hook(&self.config.hooks_directory)?;
 
-                let timer = self.status.timer();
+                let timer = next_status.timer();
 
                 if progress && timer.is_some() {
                     println!();
@@ -232,8 +232,8 @@ impl Program {
         }
     }
 
-    fn finish(&mut self) -> Result<()> {
-        match &self.status {
+    fn finish(&self) -> Result<()> {
+        match self.load_state()? {
             Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
             Status::ShortBreak(_timer) => {
                 self.clear()?;
@@ -248,7 +248,7 @@ impl Program {
         Ok(())
     }
 
-    fn clear(&mut self) -> Result<()> {
+    fn clear(&self) -> Result<()> {
         let state_file_path = &self.config.state_file_path;
 
         if state_file_path.exists() {
@@ -257,7 +257,6 @@ impl Program {
                 &self.config.state_file_path.display().to_string().cyan()
             );
             std::fs::remove_file(&self.config.state_file_path)?;
-            self.status = Status::Inactive;
 
             hooks::run_stop_hook(&self.config.hooks_directory)?;
         }
@@ -266,16 +265,18 @@ impl Program {
     }
 
     fn take_break(&mut self, timer: Timer, show_progress: bool) -> Result<()> {
-        if matches!(self.status, Status::ShortBreak(_)) {
+        let status = self.load_state()?;
+
+        if matches!(status, Status::ShortBreak(_)) {
             bail!("You are already taking a break");
         }
 
-        if !matches!(self.status, Status::Inactive) {
+        if !matches!(status, Status::Inactive) {
             bail!("Finish your current timer before taking a break");
         }
 
-        self.status = Status::ShortBreak(timer.clone());
-        self.status.save(&self.config.state_file_path)?;
+        let new_status = Status::ShortBreak(timer.clone());
+        new_status.save(&self.config.state_file_path)?;
 
         hooks::run_break_hook(&self.config.hooks_directory)?;
 
@@ -333,10 +334,8 @@ fn main() -> Result<()> {
 
     match &args.command {
         Command::Status { progress, format } => {
-            let mut state = Program::new(config);
-            state.load_state()?;
-
-            state.print_status(format.clone(), *progress);
+            let state = Program::new(config);
+            state.print_status(format.clone(), *progress)?;
         }
         Command::Start {
             duration,
@@ -344,10 +343,7 @@ fn main() -> Result<()> {
             tags,
             progress,
         } => {
-            let mut state = Program::new(config);
-            state.load_state()?;
-
-            let dur = duration.unwrap_or(state.config.pomodoro_duration);
+            let dur = duration.unwrap_or(config.pomodoro_duration);
 
             let mut pom = Pomodoro::new(Local::now(), dur);
             if let Some(desc) = description {
@@ -360,23 +356,21 @@ fn main() -> Result<()> {
                 pom.set_tags(tags);
             }
 
+            let mut state = Program::new(config);
             state.start(pom, *progress)?;
         }
         Command::Finish => {
-            let mut state = Program::new(config);
-            state.load_state()?;
+            let state = Program::new(config);
 
             state.finish()?;
         }
         Command::Clear => {
-            let mut state = Program::new(config);
-            state.load_state()?;
+            let state = Program::new(config);
 
             state.clear()?;
         }
         Command::Break { duration, progress } => {
             let mut state = Program::new(config);
-            state.load_state()?;
 
             let dur = duration.unwrap_or(state.config.short_break_duration);
 
