@@ -3,7 +3,7 @@ use std::fs::{
     read_to_string
 };
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -17,7 +17,7 @@ pub struct History {
 }
 
 impl History {
-    pub fn load(path: &PathBuf) -> Result<Self> {
+    pub fn load(path: &Path) -> Result<Self> {
         if !path.try_exists()? {
             return Ok(Self::default());
         }

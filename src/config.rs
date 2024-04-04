@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, path::PathBuf};
+use std::{fs::read_to_string, path::{Path, PathBuf}};
 
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -20,7 +20,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn init(config_path: &PathBuf) -> Result<Self> {
+    pub fn init(config_path: &Path) -> Result<Self> {
         if let Some(conf) = Config::load(&config_path)? {
             Ok(conf)
         } else {
@@ -36,7 +36,7 @@ impl Config {
         }
     }
 
-    fn load(path: &PathBuf) -> Result<Option<Self>> {
+    fn load(path: &Path) -> Result<Option<Self>> {
         if path.exists() {
             let config_str = read_to_string(path)?;
 

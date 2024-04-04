@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, path::PathBuf};
+use std::{fs::read_to_string, path::{Path, PathBuf}};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
@@ -23,7 +23,7 @@ pub enum Status {
 }
 
 impl Status {
-    pub fn load(state_file_path: &PathBuf) -> Result<Self> {
+    pub fn load(state_file_path: &Path) -> Result<Self> {
         if state_file_path.try_exists()? {
             let state_str = read_to_string(state_file_path)
                 .with_context(|| "Failed to read state file")?;
@@ -34,7 +34,7 @@ impl Status {
         }
     }
 
-    pub fn save(&self, state_file_path: &PathBuf) -> Result<()> {
+    pub fn save(&self, state_file_path: &Path) -> Result<()> {
         match &self {
             Self::Inactive => {
                 println!(
@@ -66,12 +66,12 @@ impl Status {
         }
     }
 
-    pub fn timer(&self) -> Option<Timer> {
+    pub fn timer(&self) -> Option<&Timer> {
         match self {
             Status::Inactive => None,
-            Status::Active(pom) => Some(pom.timer().clone()),
-            Status::ShortBreak(timer) => Some(timer.clone()),
-            Status::LongBreak(timer) => Some(timer.clone()),
+            Status::Active(pom) => Some(pom.timer()),
+            Status::ShortBreak(timer) => Some(timer),
+            Status::LongBreak(timer) => Some(timer),
         }
     }
 }
