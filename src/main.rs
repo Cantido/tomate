@@ -23,9 +23,6 @@ struct Args {
 enum Command {
     /// Get the current Pomodoro
     Status {
-        /// Show a progress bar and don't exit until the current timer is over
-        #[arg(short, long, default_value_t = false)]
-        progress: bool,
         /// Print a custom-formatted status for the current Pomodoro
         ///
         /// Recognizes the following tokens:
@@ -58,9 +55,6 @@ enum Command {
         /// Tags to categorize the work you're doing, comma-separated
         #[arg(short, long)]
         tags: Option<String>,
-        /// Show a progress bar and don't exit until the current timer is over
-        #[arg(short, long, default_value_t = false)]
-        progress: bool,
     },
     /// Remove the existing Pomodoro, if any
     Clear,
@@ -71,9 +65,6 @@ enum Command {
         /// Length of the break to start
         #[arg(short, long, value_parser = TimeDelta::from_human)]
         duration: Option<TimeDelta>,
-        /// Show a progress bar and don't exit until the current timer is over
-        #[arg(short, long, default_value_t = false)]
-        progress: bool,
     },
     /// Print a list of all logged Pomodoros
     History,
@@ -93,14 +84,13 @@ fn main() -> Result<()> {
     let config = Config::init(&config_path)?;
 
     match &args.command {
-        Command::Status { progress, format } => {
-            print_status(&config, format.clone(), *progress)?;
+        Command::Status { format } => {
+            print_status(&config, format.clone())?;
         }
         Command::Start {
             duration,
             description,
             tags,
-            progress,
         } => {
             let dur = duration.unwrap_or(config.pomodoro_duration);
 
@@ -118,10 +108,9 @@ fn main() -> Result<()> {
             let status = tomate::start(&config, pom)?;
 
             let timer = status.timer();
-            if *progress && timer.is_some() {
-                println!();
-                print_progress_bar(&timer.unwrap());
-            }
+
+            println!();
+            print_progress_bar(&timer.unwrap());
 
         }
         Command::Finish => {
@@ -130,16 +119,14 @@ fn main() -> Result<()> {
         Command::Clear => {
             tomate::clear(&config)?;
         }
-        Command::Break { duration, progress } => {
+        Command::Break { duration } => {
             let dur = duration.unwrap_or(config.short_break_duration);
             let timer = Timer::new(Local::now(), dur);
 
             tomate::take_break(&config, timer.clone())?;
 
-            if *progress {
-                println!();
-                print_progress_bar(&timer);
-            }
+            println!();
+            print_progress_bar(&timer);
 
         }
         Command::History => {
@@ -192,7 +179,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn print_status(config: &Config, format: Option<String>, progress: bool) -> Result<()> {
+fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     let status = Status::load(&config.state_file_path)?;
 
     match status {
@@ -223,18 +210,8 @@ fn print_status(config: &Config, format: Option<String>, progress: bool) -> Resu
             }
             println!();
 
-            if progress {
-                print_progress_bar(&pom.timer());
-                println!();
-                println!();
-            } else {
-                let remaining = pom.timer().remaining(Local::now());
-                println!(
-                    "Time remaining: {}",
-                    &remaining.max(TimeDelta::zero()).to_kitchen()
-                );
-                println!();
-            }
+            print_progress_bar(&pom.timer());
+            println!();
             println!(
                 "{}",
                 "(use \"tomate finish\" to archive this Pomodoro)".dimmed()
@@ -254,18 +231,8 @@ fn print_status(config: &Config, format: Option<String>, progress: bool) -> Resu
             println!("Taking a break");
             println!();
 
-            if progress {
-                print_progress_bar(&timer);
-                println!();
-                println!();
-            } else {
-                let remaining = timer.remaining(Local::now());
-                println!(
-                    "Time remaining: {}",
-                    &remaining.max(TimeDelta::zero()).to_kitchen()
-                );
-                println!();
-            }
+            print_progress_bar(&timer);
+            println!();
 
             println!(
                 "{}",
