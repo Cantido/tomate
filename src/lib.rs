@@ -15,7 +15,6 @@ pub mod hooks;
 pub mod time;
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "status")]
 pub enum Status {
     Inactive,
     Active(Pomodoro),
