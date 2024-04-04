@@ -81,17 +81,8 @@ enum Command {
     Purge,
 }
 
-
-fn load_state(state_path: &PathBuf) -> Result<Status> {
-    if let Ok(true) = state_path.try_exists() {
-        Ok(Status::load(state_path)?)
-    } else {
-        Ok(Status::Inactive)
-    }
-}
-
 fn print_status(config: &Config, format: Option<String>, progress: bool) -> Result<()> {
-    let status = load_state(&config.state_file_path)?;
+    let status = Status::load(&config.state_file_path)?;
 
     match status {
         Status::Active(pom) => {
@@ -198,7 +189,7 @@ fn print_progress_bar(pom: &Timer) {
 }
 
 fn start(config: &Config, pomodoro: Pomodoro, progress: bool) -> Result<()> {
-    let status = load_state(&config.state_file_path)?;
+    let status = Status::load(&config.state_file_path)?;
 
     match status {
         Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
@@ -222,7 +213,7 @@ fn start(config: &Config, pomodoro: Pomodoro, progress: bool) -> Result<()> {
 }
 
 fn finish(config: &Config) -> Result<()> {
-    let status = load_state(&config.state_file_path)?;
+    let status = Status::load(&config.state_file_path)?;
 
     match status {
         Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
@@ -256,7 +247,7 @@ fn clear(config: &Config) -> Result<()> {
 }
 
 fn take_break(config: &Config, timer: Timer, show_progress: bool) -> Result<()> {
-    let status = load_state(&config.state_file_path)?;
+    let status = Status::load(&config.state_file_path)?;
 
     if matches!(status, Status::ShortBreak(_)) {
         bail!("You are already taking a break");
