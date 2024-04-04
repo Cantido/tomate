@@ -82,243 +82,233 @@ enum Command {
 }
 
 
-struct Program {
-    pub config: Config,
+fn load_state(state_path: &PathBuf) -> Result<Status> {
+    if let Ok(true) = state_path.try_exists() {
+        Ok(Status::load(state_path)?)
+    } else {
+        Ok(Status::Inactive)
+    }
 }
 
-impl Program {
-    fn new(config: Config) -> Self {
-        Self {
-            config
-        }
-    }
+fn print_status(config: &Config, format: Option<String>, progress: bool) -> Result<()> {
+    let status = load_state(&config.state_file_path)?;
 
-    fn load_state(&self) -> Result<Status> {
-        let state_file_path = &self.config.state_file_path;
+    match status {
+        Status::Active(pom) => {
+            if let Some(format) = format {
+                println!("{}", pom.format(&format, Local::now()));
 
-        if let Ok(true) = state_file_path.try_exists() {
-            Ok(Status::load(state_file_path)?)
-        } else {
-            Ok(Status::Inactive)
-        }
-    }
-
-    fn print_status(&self, format: Option<String>, progress: bool) -> Result<()> {
-        let status = self.load_state()?;
-
-        match status {
-            Status::Active(pom) => {
-                if let Some(format) = format {
-                    println!("{}", pom.format(&format, Local::now()));
-
-                    return Ok(());
-                }
-
-                if let Some(desc) = pom.description() {
-                    println!("Current Pomodoro: {}", desc.yellow());
-                } else {
-                    println!("Current Pomodoro");
-                }
-
-                if pom.timer().done(Local::now()) {
-                    println!("Status: {}", "Done".red().bold());
-                } else {
-                    println!("Status: {}", "Active".magenta().bold());
-                }
-                println!("Duration: {}", &pom.timer().duration().to_human().cyan());
-                if let Some(tags) = pom.tags() {
-                    println!("Tags:");
-                    for tag in tags {
-                        println!("\t- {}", tag.blue());
-                    }
-                }
-                println!();
-
-                if progress {
-                    Self::print_progress_bar(&pom.timer());
-                    println!();
-                    println!();
-                } else {
-                    let remaining = pom.timer().remaining(Local::now());
-                    println!(
-                        "Time remaining: {}",
-                        &remaining.max(TimeDelta::zero()).to_kitchen()
-                    );
-                    println!();
-                }
-                println!(
-                    "{}",
-                    "(use \"tomate finish\" to archive this Pomodoro)".dimmed()
-                );
-                println!(
-                    "{}",
-                    "(use \"tomate clear\" to delete this Pomodoro)".dimmed()
-                );
+                return Ok(());
             }
-            Status::Inactive => {
-                println!("No current Pomodoro");
-                println!();
-                println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
-                println!("{}", "(use \"tomate break\" to take a break)".dimmed());
-            }
-            Status::ShortBreak(timer) => {
-                println!("Taking a break");
-                println!();
 
-                if progress {
-                    Self::print_progress_bar(&timer);
-                    println!();
-                    println!();
-                } else {
-                    let remaining = timer.remaining(Local::now());
-                    println!(
-                        "Time remaining: {}",
-                        &remaining.max(TimeDelta::zero()).to_kitchen()
-                    );
-                    println!();
+            if let Some(desc) = pom.description() {
+                println!("Current Pomodoro: {}", desc.yellow());
+            } else {
+                println!("Current Pomodoro");
+            }
+
+            if pom.timer().done(Local::now()) {
+                println!("Status: {}", "Done".red().bold());
+            } else {
+                println!("Status: {}", "Active".magenta().bold());
+            }
+            println!("Duration: {}", &pom.timer().duration().to_human().cyan());
+            if let Some(tags) = pom.tags() {
+                println!("Tags:");
+                for tag in tags {
+                    println!("\t- {}", tag.blue());
                 }
-
-                println!(
-                    "{}",
-                    "(use \"tomate finish\" to finish this break)".dimmed()
-                );
             }
-        }
-
-        Ok(())
-    }
-
-    fn print_progress_bar(pom: &Timer) {
-        let now = Local::now();
-        let elapsed_ratio =
-            pom.elapsed(now).num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
-
-        let bar_width = 40.0;
-
-        let filled_count = (bar_width * elapsed_ratio).round() as usize;
-        let unfilled_count = (bar_width * (1.0 - elapsed_ratio)).round() as usize;
-
-        let filled_bar = vec!["█"; filled_count].join("");
-        let unfilled_bar = vec!["░"; unfilled_count].join("");
-
-        println!(
-            "{} {}{} {}",
-            &pom.elapsed(now).to_kitchen(),
-            filled_bar,
-            unfilled_bar,
-            &pom.remaining(now).to_kitchen()
-        );
-    }
-
-    fn start(&mut self, pomodoro: Pomodoro, progress: bool) -> Result<()> {
-        match self.load_state()? {
-            Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
-            Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
-            Status::Inactive => {
-                let next_status = Status::Active(pomodoro);
-                next_status.save(&self.config.state_file_path)?;
-
-                hooks::run_start_hook(&self.config.hooks_directory)?;
-
-                let timer = next_status.timer();
-
-                if progress && timer.is_some() {
-                    println!();
-                    Self::print_progress_bar(&timer.unwrap());
-                }
-
-                Ok(())
-            }
-        }
-    }
-
-    fn finish(&self) -> Result<()> {
-        match self.load_state()? {
-            Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
-            Status::ShortBreak(_timer) => {
-                self.clear()?;
-            }
-            Status::Active(pom) => {
-                History::append(&pom, &self.config.history_file_path)?;
-
-                self.clear()?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn clear(&self) -> Result<()> {
-        let state_file_path = &self.config.state_file_path;
-
-        if state_file_path.exists() {
-            println!(
-                "Deleting current Pomodoro state file {}",
-                &self.config.state_file_path.display().to_string().cyan()
-            );
-            std::fs::remove_file(&self.config.state_file_path)?;
-
-            hooks::run_stop_hook(&self.config.hooks_directory)?;
-        }
-
-        Ok(())
-    }
-
-    fn take_break(&mut self, timer: Timer, show_progress: bool) -> Result<()> {
-        let status = self.load_state()?;
-
-        if matches!(status, Status::ShortBreak(_)) {
-            bail!("You are already taking a break");
-        }
-
-        if !matches!(status, Status::Inactive) {
-            bail!("Finish your current timer before taking a break");
-        }
-
-        let new_status = Status::ShortBreak(timer.clone());
-        new_status.save(&self.config.state_file_path)?;
-
-        hooks::run_break_hook(&self.config.hooks_directory)?;
-
-        if show_progress {
             println!();
-            Self::print_progress_bar(&timer);
-        }
 
-        Ok(())
-    }
-
-    fn print_history(&self) -> Result<()> {
-        if !self.config.history_file_path.exists() {
-            return Ok(());
-        }
-
-        let history = History::load(&self.config.history_file_path)?;
-
-        history.print_std();
-
-        Ok(())
-    }
-
-    fn purge(&mut self) -> Result<()> {
-        if self.config.state_file_path.exists() {
+            if progress {
+                print_progress_bar(&pom.timer());
+                println!();
+                println!();
+            } else {
+                let remaining = pom.timer().remaining(Local::now());
+                println!(
+                    "Time remaining: {}",
+                    &remaining.max(TimeDelta::zero()).to_kitchen()
+                );
+                println!();
+            }
             println!(
-                "Removing current Pomodoro file at {}",
-                self.config.state_file_path.display().to_string().cyan()
+                "{}",
+                "(use \"tomate finish\" to archive this Pomodoro)".dimmed()
             );
-            std::fs::remove_file(&self.config.state_file_path)?;
-        }
-
-        if self.config.history_file_path.exists() {
             println!(
-                "Removing history file at {}",
-                self.config.history_file_path.display().to_string().cyan()
+                "{}",
+                "(use \"tomate clear\" to delete this Pomodoro)".dimmed()
             );
-            std::fs::remove_file(&self.config.history_file_path)?;
         }
+        Status::Inactive => {
+            println!("No current Pomodoro");
+            println!();
+            println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
+            println!("{}", "(use \"tomate break\" to take a break)".dimmed());
+        }
+        Status::ShortBreak(timer) => {
+            println!("Taking a break");
+            println!();
 
-        Ok(())
+            if progress {
+                print_progress_bar(&timer);
+                println!();
+                println!();
+            } else {
+                let remaining = timer.remaining(Local::now());
+                println!(
+                    "Time remaining: {}",
+                    &remaining.max(TimeDelta::zero()).to_kitchen()
+                );
+                println!();
+            }
+
+            println!(
+                "{}",
+                "(use \"tomate finish\" to finish this break)".dimmed()
+            );
+        }
     }
+
+    Ok(())
+}
+
+fn print_progress_bar(pom: &Timer) {
+    let now = Local::now();
+    let elapsed_ratio =
+        pom.elapsed(now).num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
+
+    let bar_width = 40.0;
+
+    let filled_count = (bar_width * elapsed_ratio).round() as usize;
+    let unfilled_count = (bar_width * (1.0 - elapsed_ratio)).round() as usize;
+
+    let filled_bar = vec!["█"; filled_count].join("");
+    let unfilled_bar = vec!["░"; unfilled_count].join("");
+
+    println!(
+        "{} {}{} {}",
+        &pom.elapsed(now).to_kitchen(),
+        filled_bar,
+        unfilled_bar,
+        &pom.remaining(now).to_kitchen()
+    );
+}
+
+fn start(config: &Config, pomodoro: Pomodoro, progress: bool) -> Result<()> {
+    let status = load_state(&config.state_file_path)?;
+
+    match status {
+        Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
+        Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
+        Status::Inactive => {
+            let next_status = Status::Active(pomodoro);
+            next_status.save(&config.state_file_path)?;
+
+            hooks::run_start_hook(&config.hooks_directory)?;
+
+            let timer = next_status.timer();
+
+            if progress && timer.is_some() {
+                println!();
+                print_progress_bar(&timer.unwrap());
+            }
+
+            Ok(())
+        }
+    }
+}
+
+fn finish(config: &Config) -> Result<()> {
+    let status = load_state(&config.state_file_path)?;
+
+    match status {
+        Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
+        Status::ShortBreak(_timer) => {
+            clear(config)?;
+        }
+        Status::Active(pom) => {
+            History::append(&pom, &config.history_file_path)?;
+
+            clear(config)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn clear(config: &Config) -> Result<()> {
+    let state_file_path = &config.state_file_path;
+
+    if state_file_path.exists() {
+        println!(
+            "Deleting current Pomodoro state file {}",
+            &config.state_file_path.display().to_string().cyan()
+        );
+        std::fs::remove_file(&config.state_file_path)?;
+
+        hooks::run_stop_hook(&config.hooks_directory)?;
+    }
+
+    Ok(())
+}
+
+fn take_break(config: &Config, timer: Timer, show_progress: bool) -> Result<()> {
+    let status = load_state(&config.state_file_path)?;
+
+    if matches!(status, Status::ShortBreak(_)) {
+        bail!("You are already taking a break");
+    }
+
+    if !matches!(status, Status::Inactive) {
+        bail!("Finish your current timer before taking a break");
+    }
+
+    let new_status = Status::ShortBreak(timer.clone());
+    new_status.save(&config.state_file_path)?;
+
+    hooks::run_break_hook(&config.hooks_directory)?;
+
+    if show_progress {
+        println!();
+        print_progress_bar(&timer);
+    }
+
+    Ok(())
+}
+
+fn print_history(config: &Config) -> Result<()> {
+    if !config.history_file_path.exists() {
+        return Ok(());
+    }
+
+    let history = History::load(&config.history_file_path)?;
+
+    history.print_std();
+
+    Ok(())
+}
+
+fn purge(config: &Config) -> Result<()> {
+    if config.state_file_path.exists() {
+        println!(
+            "Removing current Pomodoro file at {}",
+            config.state_file_path.display().to_string().cyan()
+        );
+        std::fs::remove_file(&config.state_file_path)?;
+    }
+
+    if config.history_file_path.exists() {
+        println!(
+            "Removing history file at {}",
+            config.history_file_path.display().to_string().cyan()
+        );
+        std::fs::remove_file(&config.history_file_path)?;
+    }
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -334,8 +324,7 @@ fn main() -> Result<()> {
 
     match &args.command {
         Command::Status { progress, format } => {
-            let state = Program::new(config);
-            state.print_status(format.clone(), *progress)?;
+            print_status(&config, format.clone(), *progress)?;
         }
         Command::Start {
             duration,
@@ -356,36 +345,25 @@ fn main() -> Result<()> {
                 pom.set_tags(tags);
             }
 
-            let mut state = Program::new(config);
-            state.start(pom, *progress)?;
+            start(&config, pom, *progress)?;
         }
         Command::Finish => {
-            let state = Program::new(config);
-
-            state.finish()?;
+            finish(&config)?;
         }
         Command::Clear => {
-            let state = Program::new(config);
-
-            state.clear()?;
+            clear(&config)?;
         }
         Command::Break { duration, progress } => {
-            let mut state = Program::new(config);
-
-            let dur = duration.unwrap_or(state.config.short_break_duration);
+            let dur = duration.unwrap_or(config.short_break_duration);
 
             let timer = Timer::new(Local::now(), dur);
-            state.take_break(timer, *progress)?;
+            take_break(&config, timer, *progress)?;
         }
         Command::History => {
-            let state = Program::new(config);
-
-            state.print_history()?;
+            print_history(&config)?;
         }
         Command::Purge => {
-            let mut state = Program::new(config);
-
-            state.purge()?;
+            purge(&config)?;
 
             if config_path.exists() {
                 println!(
