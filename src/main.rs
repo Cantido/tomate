@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use prettytable::{color, format, Attr, Cell, Row, Table};
 
 use tomate::{config::{self, Config}, Pomodoro, Status};
 use tomate::history::History;
-use tomate::hooks;
 use tomate::time::{TimeDeltaExt, Timer};
 
 #[derive(Parser, Debug)]
@@ -79,6 +79,117 @@ enum Command {
     History,
     /// Delete all state and configuration files
     Purge,
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    let config_path = if let Some(conf_path) = args.config {
+        conf_path
+    } else {
+        config::default_config_path()?
+    };
+
+    let config = Config::init(&config_path)?;
+
+    match &args.command {
+        Command::Status { progress, format } => {
+            print_status(&config, format.clone(), *progress)?;
+        }
+        Command::Start {
+            duration,
+            description,
+            tags,
+            progress,
+        } => {
+            let dur = duration.unwrap_or(config.pomodoro_duration);
+
+            let mut pom = Pomodoro::new(Local::now(), dur);
+            if let Some(desc) = description {
+                pom.set_description(desc);
+            }
+
+            if let Some(tags) = tags {
+                let tags: Vec<String> = tags.split(",").map(|s| s.to_string()).collect();
+
+                pom.set_tags(tags);
+            }
+
+            let status = tomate::start(&config, pom)?;
+
+            let timer = status.timer();
+            if *progress && timer.is_some() {
+                println!();
+                print_progress_bar(&timer.unwrap());
+            }
+
+        }
+        Command::Finish => {
+            tomate::finish(&config)?;
+        }
+        Command::Clear => {
+            tomate::clear(&config)?;
+        }
+        Command::Break { duration, progress } => {
+            let dur = duration.unwrap_or(config.short_break_duration);
+            let timer = Timer::new(Local::now(), dur);
+
+            tomate::take_break(&config, timer.clone())?;
+
+            if *progress {
+                println!();
+                print_progress_bar(&timer);
+            }
+
+        }
+        Command::History => {
+            if !config.history_file_path.exists() {
+                return Ok(());
+            }
+
+            let history = History::load(&config.history_file_path)?;
+
+            let mut table = Table::new();
+
+            table.set_titles(Row::new(vec![
+                Cell::new("Date Started").with_style(Attr::Underline(true)),
+                Cell::new("Duration").with_style(Attr::Underline(true)),
+                Cell::new("Tags").with_style(Attr::Underline(true)),
+                Cell::new("Description").with_style(Attr::Underline(true)),
+            ]));
+
+            for pom in history.pomodoros().iter() {
+                let date = pom.timer().starts_at().format("%d %b %R").to_string();
+                let dur = &pom.timer().duration().to_human();
+                let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
+                let desc = pom.description().clone().unwrap_or("-");
+
+                table.add_row(Row::new(vec![
+                    Cell::new(&date).with_style(Attr::ForegroundColor(color::BLUE)),
+                    Cell::new(&dur)
+                        .style_spec("r")
+                        .with_style(Attr::ForegroundColor(color::CYAN)),
+                    Cell::new(&tags),
+                    Cell::new(&desc),
+                ]));
+            }
+            table.set_format(*format::consts::FORMAT_CLEAN);
+            table.printstd();
+        }
+        Command::Purge => {
+            tomate::purge(&config)?;
+
+            if config_path.exists() {
+                println!(
+                    "Removing config file at {}",
+                    config_path.display().to_string().cyan()
+                );
+                std::fs::remove_file(&config_path)?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn print_status(config: &Config, format: Option<String>, progress: bool) -> Result<()> {
@@ -188,183 +299,3 @@ fn print_progress_bar(pom: &Timer) {
     );
 }
 
-fn start(config: &Config, pomodoro: Pomodoro, progress: bool) -> Result<()> {
-    let status = Status::load(&config.state_file_path)?;
-
-    match status {
-        Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
-        Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
-        Status::Inactive => {
-            let next_status = Status::Active(pomodoro);
-            next_status.save(&config.state_file_path)?;
-
-            hooks::run_start_hook(&config.hooks_directory)?;
-
-            let timer = next_status.timer();
-
-            if progress && timer.is_some() {
-                println!();
-                print_progress_bar(&timer.unwrap());
-            }
-
-            Ok(())
-        }
-    }
-}
-
-fn finish(config: &Config) -> Result<()> {
-    let status = Status::load(&config.state_file_path)?;
-
-    match status {
-        Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
-        Status::ShortBreak(_timer) => {
-            clear(config)?;
-        }
-        Status::Active(pom) => {
-            History::append(&pom, &config.history_file_path)?;
-
-            clear(config)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn clear(config: &Config) -> Result<()> {
-    let state_file_path = &config.state_file_path;
-
-    if state_file_path.exists() {
-        println!(
-            "Deleting current Pomodoro state file {}",
-            &config.state_file_path.display().to_string().cyan()
-        );
-        std::fs::remove_file(&config.state_file_path)?;
-
-        hooks::run_stop_hook(&config.hooks_directory)?;
-    }
-
-    Ok(())
-}
-
-fn take_break(config: &Config, timer: Timer, show_progress: bool) -> Result<()> {
-    let status = Status::load(&config.state_file_path)?;
-
-    if matches!(status, Status::ShortBreak(_)) {
-        bail!("You are already taking a break");
-    }
-
-    if !matches!(status, Status::Inactive) {
-        bail!("Finish your current timer before taking a break");
-    }
-
-    let new_status = Status::ShortBreak(timer.clone());
-    new_status.save(&config.state_file_path)?;
-
-    hooks::run_break_hook(&config.hooks_directory)?;
-
-    if show_progress {
-        println!();
-        print_progress_bar(&timer);
-    }
-
-    Ok(())
-}
-
-fn print_history(config: &Config) -> Result<()> {
-    if !config.history_file_path.exists() {
-        return Ok(());
-    }
-
-    let history = History::load(&config.history_file_path)?;
-
-    history.print_std();
-
-    Ok(())
-}
-
-fn purge(config: &Config) -> Result<()> {
-    if config.state_file_path.exists() {
-        println!(
-            "Removing current Pomodoro file at {}",
-            config.state_file_path.display().to_string().cyan()
-        );
-        std::fs::remove_file(&config.state_file_path)?;
-    }
-
-    if config.history_file_path.exists() {
-        println!(
-            "Removing history file at {}",
-            config.history_file_path.display().to_string().cyan()
-        );
-        std::fs::remove_file(&config.history_file_path)?;
-    }
-
-    Ok(())
-}
-
-fn main() -> Result<()> {
-    let args = Args::parse();
-
-    let config_path = if let Some(conf_path) = args.config {
-        conf_path
-    } else {
-        config::default_config_path()?
-    };
-
-    let config = Config::init(&config_path)?;
-
-    match &args.command {
-        Command::Status { progress, format } => {
-            print_status(&config, format.clone(), *progress)?;
-        }
-        Command::Start {
-            duration,
-            description,
-            tags,
-            progress,
-        } => {
-            let dur = duration.unwrap_or(config.pomodoro_duration);
-
-            let mut pom = Pomodoro::new(Local::now(), dur);
-            if let Some(desc) = description {
-                pom.set_description(desc);
-            }
-
-            if let Some(tags) = tags {
-                let tags: Vec<String> = tags.split(",").map(|s| s.to_string()).collect();
-
-                pom.set_tags(tags);
-            }
-
-            start(&config, pom, *progress)?;
-        }
-        Command::Finish => {
-            finish(&config)?;
-        }
-        Command::Clear => {
-            clear(&config)?;
-        }
-        Command::Break { duration, progress } => {
-            let dur = duration.unwrap_or(config.short_break_duration);
-
-            let timer = Timer::new(Local::now(), dur);
-            take_break(&config, timer, *progress)?;
-        }
-        Command::History => {
-            print_history(&config)?;
-        }
-        Command::Purge => {
-            purge(&config)?;
-
-            if config_path.exists() {
-                println!(
-                    "Removing config file at {}",
-                    config_path.display().to_string().cyan()
-                );
-                std::fs::remove_file(&config_path)?;
-            }
-        }
-    }
-
-    Ok(())
-}

@@ -1,9 +1,11 @@
 use std::{fs::read_to_string, path::PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use colored::Colorize;
+use config::Config;
 use directories::ProjectDirs;
+use history::History;
 use serde::{Deserialize, Serialize};
 use time::{Timer, TimeDeltaExt};
 
@@ -132,6 +134,42 @@ impl Pomodoro {
     }
 }
 
+pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
+    let status = Status::load(&config.state_file_path)?;
+
+    match status {
+        Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
+        Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
+        Status::Inactive => {
+            let next_status = Status::Active(pomodoro);
+            next_status.save(&config.state_file_path)?;
+
+            hooks::run_start_hook(&config.hooks_directory)?;
+
+            Ok(next_status)
+        }
+    }
+}
+
+pub fn take_break(config: &Config, timer: Timer) -> Result<()> {
+    let status = Status::load(&config.state_file_path)?;
+
+    if matches!(status, Status::ShortBreak(_)) {
+        bail!("You are already taking a break");
+    }
+
+    if !matches!(status, Status::Inactive) {
+        bail!("Finish your current timer before taking a break");
+    }
+
+    let new_status = Status::ShortBreak(timer.clone());
+    new_status.save(&config.state_file_path)?;
+
+    hooks::run_break_hook(&config.hooks_directory)?;
+
+    Ok(())
+}
+
 pub fn default_config_path() -> Result<PathBuf> {
     let conf_path = ProjectDirs::from("dev", "Cosmicrose", "Tomate")
         .with_context(|| "Unable to determine XDG directories")?
@@ -139,6 +177,60 @@ pub fn default_config_path() -> Result<PathBuf> {
         .join("config.toml");
 
     Ok(conf_path)
+}
+
+pub fn finish(config: &Config) -> Result<()> {
+    let status = Status::load(&config.state_file_path)?;
+
+    match status {
+        Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
+        Status::ShortBreak(_timer) => {
+            clear(config)?;
+        }
+        Status::Active(pom) => {
+            History::append(&pom, &config.history_file_path)?;
+
+            clear(config)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn clear(config: &Config) -> Result<()> {
+    let state_file_path = &config.state_file_path;
+
+    if state_file_path.exists() {
+        println!(
+            "Deleting current Pomodoro state file {}",
+            &config.state_file_path.display().to_string().cyan()
+        );
+        std::fs::remove_file(&config.state_file_path)?;
+
+        hooks::run_stop_hook(&config.hooks_directory)?;
+    }
+
+    Ok(())
+}
+
+pub fn purge(config: &Config) -> Result<()> {
+    if config.state_file_path.exists() {
+        println!(
+            "Removing current Pomodoro file at {}",
+            config.state_file_path.display().to_string().cyan()
+        );
+        std::fs::remove_file(&config.state_file_path)?;
+    }
+
+    if config.history_file_path.exists() {
+        println!(
+            "Removing history file at {}",
+            config.history_file_path.display().to_string().cyan()
+        );
+        std::fs::remove_file(&config.history_file_path)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
