@@ -1,13 +1,15 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
-use anyhow::Result;
-use chrono::{prelude::*, TimeDelta};
+use anyhow::{Context, Result};
+use chrono::prelude::*;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 
+use regex::Regex;
 use tomate::{Config, History, Pomodoro, Status};
-use tomate::time::{TimeDeltaExt, Timer};
+use tomate::time::Timer;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -47,8 +49,8 @@ enum Command {
     /// Start a Pomodoro
     Start {
         /// Length of the Pomodoro to start
-        #[arg(short, long, value_parser = TimeDelta::from_human)]
-        duration: Option<TimeDelta>,
+        #[arg(short, long, value_parser = duration_from_human)]
+        duration: Option<Duration>,
         /// Description of the task you're focusing on
         description: Option<String>,
         /// Tags to categorize the work you're doing, comma-separated
@@ -62,8 +64,8 @@ enum Command {
     /// Take a break
     Break {
         /// Length of the break to start
-        #[arg(short, long, value_parser = TimeDelta::from_human)]
-        duration: Option<TimeDelta>,
+        #[arg(short, long, value_parser = duration_from_human)]
+        duration: Option<Duration>,
         /// Take a long break instead of a short break
         #[arg(short, long, default_value_t = false)]
         long: bool,
@@ -159,7 +161,7 @@ fn main() -> Result<()> {
 
             for pom in history.pomodoros().iter() {
                 let date = pom.timer().starts_at().format("%d %b %R").to_string();
-                let dur = &pom.timer().duration().to_human();
+                let dur = tomate::time::duration::to_human(&pom.timer().duration());
                 let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
                 let desc = pom.description().clone().unwrap_or("-");
 
@@ -213,7 +215,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
             } else {
                 println!("Status: {}", "Active".magenta().bold());
             }
-            println!("Duration: {}", &pom.timer().duration().to_human().cyan());
+            println!("Duration: {}", tomate::time::duration::to_human(&pom.timer().duration()).cyan());
             if let Some(tags) = pom.tags() {
                 println!("Tags:");
                 for tag in tags {
@@ -268,10 +270,24 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     Ok(())
 }
 
+fn duration_from_human(input: &str) -> Result<Duration> {
+    let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$").unwrap();
+    let caps = re.captures(&input)
+    .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
+
+    let hours: u64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
+    let minutes: u64 = caps.get(2).map_or("0", |c| c.as_str()).parse()?;
+    let seconds: u64 = caps.get(3).map_or("0", |c| c.as_str()).parse()?;
+
+    let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
+
+    Ok(Duration::new(total_seconds, 0))
+}
+
 fn print_progress_bar(pom: &Timer) {
     let now = Local::now();
     let elapsed_ratio =
-        pom.elapsed(now).num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
+        pom.elapsed(now).as_millis() as f32 / pom.duration().as_millis() as f32;
 
     let bar_width = 40.0;
 
@@ -283,10 +299,10 @@ fn print_progress_bar(pom: &Timer) {
 
     println!(
         "{} {}{} {}",
-        &pom.elapsed(now).to_kitchen(),
+        tomate::time::duration::to_kitchen(&pom.elapsed(now)),
         filled_bar,
         unfilled_bar,
-        &pom.remaining(now).to_kitchen()
+        tomate::time::duration::to_kitchen(&pom.remaining(now)),
     );
 }
 

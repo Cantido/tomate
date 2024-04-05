@@ -1,6 +1,9 @@
-use chrono::{prelude::*, TimeDelta};
+use std::time::Duration;
+
+use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::time::{Timer, TimeDeltaExt};
+use crate::time::Timer;
+use crate::time::duration;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pomodoro {
@@ -13,7 +16,7 @@ pub struct Pomodoro {
 }
 
 impl Pomodoro {
-    pub fn new(starts_at: DateTime<Local>, duration: TimeDelta) -> Self {
+    pub fn new(starts_at: DateTime<Local>, duration: Duration) -> Self {
         let timer = Timer::new(starts_at, duration);
         Self {
             timer,
@@ -58,8 +61,8 @@ impl Pomodoro {
                     .unwrap_or(&Vec::<String>::new())
                     .join(","),
             )
-            .replace("%r", &self.timer.remaining(now).to_kitchen())
-            .replace("%R", &self.timer.remaining(now).num_seconds().to_string())
+            .replace("%r", &duration::to_kitchen(&self.timer.remaining(now)))
+            .replace("%R", &self.timer.remaining(now).as_secs().to_string())
             .replace("%s", &self.timer.starts_at().to_rfc3339())
             .replace("%S", &self.timer.starts_at().timestamp().to_string())
             .replace("%e", &self.timer.ends_at().to_rfc3339())
