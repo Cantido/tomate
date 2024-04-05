@@ -14,7 +14,7 @@ use tomate::time::Timer;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[command(subcommand)]
+    #[clap(subcommand)]
     command: Command,
     /// Config file to use. [default: ${XDG_CONFIG_DIR}/tomate/config.toml]
     config: Option<PathBuf>,
