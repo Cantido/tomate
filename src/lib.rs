@@ -65,15 +65,6 @@ impl Status {
             },
         }
     }
-
-    pub fn timer(&self) -> Option<&Timer> {
-        match self {
-            Status::Inactive => None,
-            Status::Active(pom) => Some(pom.timer()),
-            Status::ShortBreak(timer) => Some(timer),
-            Status::LongBreak(timer) => Some(timer),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
