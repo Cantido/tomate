@@ -2,6 +2,13 @@
 name = "tomate"
 version = "0.1.0"
 edition = "2021"
+authors = ["Rosa Richter"]
+license = "MIT"
+description = "A Pomodoro CLI tool"
+homepage = "https://github.com/Cantido/tomate"
+repository = "https://github.com/Cantido/tomate"
+keywords = ["cli", "pomodoro"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
