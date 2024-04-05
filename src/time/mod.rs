@@ -2,32 +2,31 @@ pub mod duration;
 pub mod datetime;
 pub mod datetimeopt;
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
-use chrono::{prelude::*, TimeDelta};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Timer {
     #[serde(with = "crate::time::datetime::unix")]
-    started_at: DateTime<Local>,
+    started_at: SystemTime,
     #[serde(with = "crate::time::duration::seconds")]
     duration: Duration,
 }
 
 impl Timer {
-    pub fn new(started_at: DateTime<Local>, duration: Duration) -> Self {
+    pub fn new(started_at: SystemTime, duration: Duration) -> Self {
         Self {
             started_at,
             duration,
         }
     }
 
-    pub fn starts_at(&self) -> DateTime<Local> {
+    pub fn starts_at(&self) -> SystemTime {
         self.started_at
     }
 
-    pub fn ends_at(&self) -> DateTime<Local> {
+    pub fn ends_at(&self) -> SystemTime {
         self.started_at + self.duration
     }
 
@@ -35,15 +34,15 @@ impl Timer {
         self.duration
     }
 
-    pub fn elapsed(&self, now: DateTime<Local>) -> Duration {
-        (now - self.started_at).clamp(TimeDelta::zero(), TimeDelta::from_std(self.duration).unwrap()).to_std().unwrap()
+    pub fn elapsed(&self, now: SystemTime) -> Duration {
+        now.duration_since(self.started_at).unwrap()
     }
 
-    pub fn remaining(&self, now: DateTime<Local>) -> Duration {
+    pub fn remaining(&self, now: SystemTime) -> Duration {
         (self.duration - self.elapsed(now)).clamp(Duration::ZERO, self.duration)
     }
 
-    pub fn done(&self, now: DateTime<Local>) -> bool {
+    pub fn done(&self, now: SystemTime) -> bool {
         now > self.ends_at()
     }
 }

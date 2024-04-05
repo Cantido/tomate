@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use chrono::prelude::*;
@@ -98,7 +98,7 @@ fn main() -> Result<()> {
         } => {
             let dur = duration.unwrap_or(config.pomodoro_duration);
 
-            let mut pom = Pomodoro::new(Local::now(), dur);
+            let mut pom = Pomodoro::new(SystemTime::now(), dur);
             if let Some(desc) = description {
                 pom.set_description(desc);
             }
@@ -126,13 +126,13 @@ fn main() -> Result<()> {
 
             let timer = if *long {
                 let dur = duration.unwrap_or(config.long_break_duration);
-                let timer = Timer::new(Local::now(), dur);
+                let timer = Timer::new(SystemTime::now(), dur);
 
                 tomate::take_long_break(&config, timer.clone())?;
                 timer
             } else {
                 let dur = duration.unwrap_or(config.short_break_duration);
-                let timer = Timer::new(Local::now(), dur);
+                let timer = Timer::new(SystemTime::now(), dur);
 
                 tomate::take_short_break(&config, timer.clone())?;
 
@@ -160,7 +160,8 @@ fn main() -> Result<()> {
             ]));
 
             for pom in history.pomodoros().iter() {
-                let date = pom.timer().starts_at().format("%d %b %R").to_string();
+                let starts_at: DateTime<Local> = pom.timer().starts_at().into();
+                let date = starts_at.format("%d %b %R").to_string();
                 let dur = tomate::time::duration::to_human(&pom.timer().duration());
                 let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
                 let desc = pom.description().clone().unwrap_or("-");
@@ -199,7 +200,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     match status {
         Status::Active(pom) => {
             if let Some(format) = format {
-                println!("{}", pom.format(&format, Local::now()));
+                println!("{}", pom.format(&format, SystemTime::now()));
 
                 return Ok(());
             }
@@ -210,7 +211,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
                 println!("Current Pomodoro");
             }
 
-            if pom.timer().done(Local::now()) {
+            if pom.timer().done(SystemTime::now()) {
                 println!("Status: {}", "Done".red().bold());
             } else {
                 println!("Status: {}", "Active".magenta().bold());
@@ -285,7 +286,7 @@ fn duration_from_human(input: &str) -> Result<Duration> {
 }
 
 fn print_progress_bar(pom: &Timer) {
-    let now = Local::now();
+    let now = SystemTime::now();
     let elapsed_ratio =
         pom.elapsed(now).as_millis() as f32 / pom.duration().as_millis() as f32;
 
