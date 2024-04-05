@@ -6,8 +6,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 
-use tomate::{config::{self, Config}, Pomodoro, Status};
-use tomate::history::History;
+use tomate::{Config, History, Pomodoro, Status};
 use tomate::time::{TimeDeltaExt, Timer};
 
 #[derive(Parser, Debug)]
@@ -81,7 +80,7 @@ fn main() -> Result<()> {
     let config_path = if let Some(conf_path) = args.config {
         conf_path
     } else {
-        config::default_config_path()?
+        tomate::default_config_path()?
     };
 
     let config = Config::init(&config_path)?;

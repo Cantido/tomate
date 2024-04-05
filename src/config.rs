@@ -74,12 +74,3 @@ impl Default for Config {
     }
 }
 
-pub fn default_config_path() -> Result<PathBuf> {
-    let conf_path = ProjectDirs::from("dev", "Cosmicrose", "Tomate")
-        .with_context(|| "Unable to determine XDG directories")?
-        .config_dir()
-        .join("config.toml");
-
-    Ok(conf_path)
-}
-
