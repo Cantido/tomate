@@ -11,11 +11,11 @@ pub struct Config {
     pub hooks_directory: PathBuf,
     pub state_file_path: PathBuf,
     pub history_file_path: PathBuf,
-    #[serde(with = "crate::time::duration")]
+    #[serde(with = "crate::time::duration::seconds")]
     pub pomodoro_duration: TimeDelta,
-    #[serde(with = "crate::time::duration")]
+    #[serde(with = "crate::time::duration::seconds")]
     pub short_break_duration: TimeDelta,
-    #[serde(with = "crate::time::duration")]
+    #[serde(with = "crate::time::duration::seconds")]
     pub long_break_duration: TimeDelta,
 }
 

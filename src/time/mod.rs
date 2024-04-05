@@ -1,4 +1,6 @@
 pub mod duration;
+pub mod datetime;
+pub mod datetimeopt;
 
 use std::{fmt::Display, str::FromStr};
 
@@ -103,10 +105,10 @@ impl TimeDeltaExt for TimeDelta {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
 pub struct Timer {
+    #[serde(with = "crate::time::datetime::unix")]
     started_at: DateTime<Local>,
-    #[serde(with = "crate::duration")]
+    #[serde(with = "crate::time::duration::seconds")]
     duration: TimeDelta,
 }
 

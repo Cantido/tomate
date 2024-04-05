@@ -78,9 +78,12 @@ impl Status {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pomodoro {
+    #[serde(flatten)]
     timer: Timer,
     description: Option<String>,
     tags: Option<Vec<String>>,
+    #[serde(default, with = "crate::time::datetimeopt::unix")]
+    finished_at: Option<DateTime<Local>>,
 }
 
 impl Pomodoro {
@@ -88,6 +91,7 @@ impl Pomodoro {
         let timer = Timer::new(starts_at, duration);
         Self {
             timer,
+            finished_at: None,
             description: None,
             tags: None,
         }
@@ -111,6 +115,10 @@ impl Pomodoro {
 
     pub fn set_tags(&mut self, tags: Vec<String>) {
         self.tags = Some(tags);
+    }
+
+    pub fn finish(&mut self, now: DateTime<Local>) {
+        self.finished_at = Some(now);
     }
 
     pub fn format(&self, f: &str, now: DateTime<Local>) -> String {
@@ -205,7 +213,9 @@ pub fn finish(config: &Config) -> Result<()> {
         Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
         Status::ShortBreak(_timer) => clear(config)?,
         Status::LongBreak(_timer) => clear(config)?,
-        Status::Active(pom) => {
+        Status::Active(mut pom) => {
+            pom.finish(Local::now());
+
             History::append(&pom, &config.history_file_path)?;
 
             clear(config)?;
@@ -262,29 +272,42 @@ mod test {
         let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
         let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
-        let pom = Pomodoro::new(dt, dur);
+        let mut pom = Pomodoro::new(dt, dur);
+        pom.set_description("test converting poms to toml");
+        pom.set_tags(vec!["test".to_string(), "toml".to_string()]);
 
         let status = Status::Active(pom);
 
-        let toml = toml::to_string_pretty(&status).unwrap();
+        let toml = toml::to_string(&status).unwrap();
         let lines: Vec<&str> = toml.lines().collect();
 
-        assert_eq!(lines[0], "status = \"Active\"");
-        assert_eq!(lines[1], "timer = \"2024-03-27T12:00:00-06:00/PT1500S\"");
+        assert_eq!(lines[0], "[Active]");
+
+        assert_eq!(lines[1], "started_at = 1711562400");
+        assert_eq!(lines[2], "duration = 1500");
+        assert_eq!(lines[3], r#"description = "test converting poms to toml""#);
+        assert_eq!(lines[4], r#"tags = ["test", "toml"]"#);
     }
 
     #[test]
     fn toml_to_pom() {
-        let pom: Pomodoro = toml::from_str(
-            r#"timer = "2024-03-27T12:00:00-06:00/PT1500S""#,
+        let pom: Pomodoro = toml::from_str(r#"
+started_at = 1712346817
+duration = 1500
+description = "Do something cool"
+tags = ["work", "fun"]
+            "#,
         )
         .expect("Could not parse pomodoro from string");
 
-        let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+        let dt: DateTime<Local> = "2024-04-05T13:53:37-06:00".parse().unwrap();
         let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
         assert_eq!(pom.timer().starts_at(), dt);
         assert_eq!(pom.timer().duration(), dur);
+        assert_eq!(pom.description(), Some("Do something cool"));
+        let tags = vec!["work".to_string(), "fun".to_string()];
+        assert_eq!(pom.tags().unwrap(), tags);
     }
 
     #[test]

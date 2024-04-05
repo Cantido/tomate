@@ -108,12 +108,11 @@ fn main() -> Result<()> {
                 pom.set_tags(tags);
             }
 
-            let status = tomate::start(&config, pom)?;
-
-            let timer = status.timer();
+            tomate::start(&config, pom)?;
 
             println!();
-            print_progress_bar(&timer.unwrap());
+
+            print_status(&config, None)?;
 
         }
         Command::Finish => {
