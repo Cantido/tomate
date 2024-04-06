@@ -7,9 +7,10 @@
 //! as well as a history of completed Pomodoros.
 //!
 //! All the interface functions in this module require a [`Config`] struct.
-//! You can load one from a path with [`Config::load`].
+//! Check out that struct's documentation for default values and functions
+//! for loading and saving a configuration.
 
-use std::{fs::read_to_string, path::Path, time::SystemTime};
+use std::{fs::{read_to_string, OpenOptions}, io::{Read, Write}, path::Path, time::SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use colored::Colorize;
@@ -42,13 +43,23 @@ impl Status {
     /// Load from a state file
     pub fn load(state_file_path: &Path) -> Result<Self> {
         if state_file_path.try_exists()? {
-            let state_str = read_to_string(state_file_path)
-                .with_context(|| "Failed to read state file")?;
-            toml::from_str(&state_str)
-                .with_context(|| "Failed to parse state file")
+            let file = OpenOptions::new().read(true).open(state_file_path)?;
+            Self::from_reader(file)
         } else {
             Ok(Self::Inactive)
         }
+    }
+
+    /// Load state from a reader
+    pub fn from_reader<R>(reader: R) -> Result<Self>
+    where
+        R: Read
+    {
+        let state_str = std::io::read_to_string(reader)
+            .with_context(|| "Failed to read state file")?;
+
+        toml::from_str(&state_str)
+            .with_context(|| "Failed to parse state file")
     }
 
     /// Save this status as a TOML file
@@ -75,13 +86,24 @@ impl Status {
                 std::fs::create_dir_all(state_file_dir)
                     .with_context(|| "Failed to create directory for state file")?;
 
-                let contents = toml::to_string(&self)?;
-
-                std::fs::write(&state_file_path, contents)?;
+                let file = OpenOptions::new().read(true).write(true).truncate(true).open(state_file_path)?;
+                self.to_writer(file)?;
 
                 Ok(())
             },
         }
+    }
+
+    /// Save this pomodoro to an output stream
+    pub fn to_writer<W>(&self, mut writer: W) -> Result<()>
+    where
+        W: Write
+    {
+        let contents = toml::to_string(&self)
+            .with_context(|| "Unable to serialize Pomodoro")?;
+
+        writer.write_all(&contents.as_bytes())
+            .with_context(|| "Unable to save Pomodoro to writer")
     }
 }
 
