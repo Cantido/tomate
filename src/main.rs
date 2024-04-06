@@ -414,8 +414,9 @@ mod test {
         let pom = Pomodoro::new(dt, dur);
 
         let actual_format = format_pomodoro(&pom, "%s", dt);
+        let expected_format = dt.to_rfc3339();
 
-        assert_eq!(actual_format, "2024-03-27T12:00:00-06:00");
+        assert_eq!(actual_format, expected_format);
     }
 
     #[test]
@@ -451,8 +452,9 @@ mod test {
         let pom = Pomodoro::new(dt, dur);
 
         let actual_format = format_pomodoro(&pom, "%e", dt);
+        let expected_format = (dt + dur).to_rfc3339();
 
-        assert_eq!(actual_format, "2024-03-27T12:25:00-06:00");
+        assert_eq!(actual_format, expected_format);
     }
 
     #[test]
