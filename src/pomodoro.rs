@@ -1,6 +1,6 @@
+use crate::time::Timer;
 use chrono::{prelude::*, TimeDelta};
 use serde::{Deserialize, Serialize};
-use crate::time::Timer;
 
 /// A Pomodoro timer
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]

@@ -10,7 +10,11 @@
 //! Check out that struct's documentation for default values and functions
 //! for loading and saving a configuration.
 
-use std::{fs::OpenOptions, io::{Read, Write}, path::Path};
+use std::{
+    fs::OpenOptions,
+    io::{Read, Write},
+    path::Path,
+};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::prelude::*;
@@ -19,7 +23,7 @@ use log::info;
 use serde::{Deserialize, Serialize};
 
 mod config;
-pub use config::{Config, default_config_path};
+pub use config::{default_config_path, Config};
 mod history;
 pub use history::History;
 mod hooks;
@@ -55,13 +59,12 @@ impl Status {
     /// Load state from a reader
     pub fn from_reader<R>(reader: R) -> Result<Self>
     where
-        R: Read
+        R: Read,
     {
-        let state_str = std::io::read_to_string(reader)
-            .with_context(|| "Failed to read state file")?;
+        let state_str =
+            std::io::read_to_string(reader).with_context(|| "Failed to read state file")?;
 
-        toml::from_str(&state_str)
-            .with_context(|| "Failed to parse state file")
+        toml::from_str(&state_str).with_context(|| "Failed to parse state file")
     }
 
     /// Save this status as a TOML file
@@ -74,7 +77,7 @@ impl Status {
                 );
                 std::fs::remove_file(&state_file_path)?;
                 Ok(())
-            },
+            }
             _ => {
                 if !state_file_path.try_exists()? {
                     info!(
@@ -83,31 +86,40 @@ impl Status {
                     );
                 }
 
-                let state_file_dir = state_file_path.parent()
-                        .with_context(|| "State file path does not have a parent directory")?;
+                let state_file_dir = state_file_path
+                    .parent()
+                    .with_context(|| "State file path does not have a parent directory")?;
                 std::fs::create_dir_all(state_file_dir)
                     .with_context(|| "Failed to create directory for state file")?;
 
-                let file = OpenOptions::new().create(true).read(true).write(true).truncate(true).open(state_file_path)
-                    .with_context(|| format!("Unable to open state file {}", state_file_path.display()))?;
+                let file = OpenOptions::new()
+                    .create(true)
+                    .read(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(state_file_path)
+                    .with_context(|| {
+                        format!("Unable to open state file {}", state_file_path.display())
+                    })?;
 
-                self.to_writer(file)
-                    .with_context(|| format!("Failed to save Pomodoro to {}", state_file_path.display()))?;
+                self.to_writer(file).with_context(|| {
+                    format!("Failed to save Pomodoro to {}", state_file_path.display())
+                })?;
 
                 Ok(())
-            },
+            }
         }
     }
 
     /// Save this pomodoro to an output stream
     pub fn to_writer<W>(&self, mut writer: W) -> Result<()>
     where
-        W: Write
+        W: Write,
     {
-        let contents = toml::to_string(&self)
-            .with_context(|| "Unable to serialize Pomodoro")?;
+        let contents = toml::to_string(&self).with_context(|| "Unable to serialize Pomodoro")?;
 
-        writer.write_all(&contents.as_bytes())
+        writer
+            .write_all(&contents.as_bytes())
             .with_context(|| "Unable to save Pomodoro to writer")
     }
 }
@@ -122,7 +134,8 @@ pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
         Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
         Status::Inactive => {
             let next_status = Status::Active(pomodoro);
-            next_status.save(&config.state_file_path)
+            next_status
+                .save(&config.state_file_path)
                 .with_context(|| "Unable to save new Pomodoro")?;
 
             hooks::run_start_hook(&config.hooks_directory)?;
@@ -258,7 +271,8 @@ mod test {
 
     #[test]
     fn toml_to_pom() {
-        let pom: Pomodoro = toml::from_str(r#"
+        let pom: Pomodoro = toml::from_str(
+            r#"
 started_at = 1712346817
 duration = 1500
 description = "Do something cool"

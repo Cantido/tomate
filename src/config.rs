@@ -1,8 +1,11 @@
-use std::{fs::read_to_string, path::{Path, PathBuf}};
+use std::{
+    fs::read_to_string,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result};
-use colored::Colorize;
 use chrono::TimeDelta;
+use colored::Colorize;
 use directories::ProjectDirs;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -48,19 +51,28 @@ pub struct Config {
     ///
     /// Default is 25 minutes (1500 seconds).
     /// Serialized as an integer count of seconds.
-    #[serde(default = "default_pomodoro_duration", with = "crate::time::duration::seconds")]
+    #[serde(
+        default = "default_pomodoro_duration",
+        with = "crate::time::duration::seconds"
+    )]
     pub pomodoro_duration: TimeDelta,
     /// Default duration for short break timers
     ///
     /// Default is 5 minutes (300 seconds).
     /// Serialized as an integer count of seconds.
-    #[serde(default = "default_short_break_duration", with = "crate::time::duration::seconds")]
+    #[serde(
+        default = "default_short_break_duration",
+        with = "crate::time::duration::seconds"
+    )]
     pub short_break_duration: TimeDelta,
     /// Default duration for long break timers
     ///
     /// Default is 20 minutes (1200 seconds).
     /// Serialized as an integer count of seconds.
-    #[serde(default = "default_long_break_duration", with = "crate::time::duration::seconds")]
+    #[serde(
+        default = "default_long_break_duration",
+        with = "crate::time::duration::seconds"
+    )]
     pub long_break_duration: TimeDelta,
 }
 
@@ -104,8 +116,7 @@ impl Config {
 
     /// Write this config file to the filesystem
     pub fn save(&self, path: &Path) -> Result<()> {
-        let toml = toml::to_string(&self)
-            .with_context(|| "Unable to format config as TOML")?;
+        let toml = toml::to_string(&self).with_context(|| "Unable to format config as TOML")?;
 
         std::fs::write(&path, toml)
             .with_context(|| format!("Unable to write config TOML to path {}", path.display()))
@@ -172,5 +183,3 @@ fn default_short_break_duration() -> TimeDelta {
 fn default_long_break_duration() -> TimeDelta {
     TimeDelta::new(20 * 60, 0).unwrap()
 }
-
-

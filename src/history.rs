@@ -1,7 +1,4 @@
-use std::fs::{
-    OpenOptions,
-    read_to_string
-};
+use std::fs::{read_to_string, OpenOptions};
 use std::io::prelude::*;
 use std::path::Path;
 
@@ -25,10 +22,8 @@ impl History {
             return Ok(Self::default());
         }
 
-        let history_str = read_to_string(path)
-            .with_context(|| "Failed to read history file")?;
-        toml::from_str(&history_str)
-            .with_context(|| "Failed to parse history file")
+        let history_str = read_to_string(path).with_context(|| "Failed to read history file")?;
+        toml::from_str(&history_str).with_context(|| "Failed to parse history file")
     }
 
     /// Get the list of historical Pomodoros

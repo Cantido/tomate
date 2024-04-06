@@ -1,8 +1,8 @@
-#[doc(hidden)]
-pub mod duration;
 mod datetime;
 #[doc(hidden)]
 pub mod datetimeopt;
+#[doc(hidden)]
+pub mod duration;
 
 use chrono::{prelude::*, TimeDelta};
 use serde::{Deserialize, Serialize};
@@ -55,4 +55,3 @@ impl Timer {
         now > self.ends_at()
     }
 }
-

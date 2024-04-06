@@ -75,21 +75,17 @@ enum Command {
 }
 
 fn main() -> Result<()> {
-    env_logger::builder()
-        .format_timestamp(None)
-        .init();
+    env_logger::builder().format_timestamp(None).init();
 
     let args = Args::parse();
 
     let config_path = if let Some(conf_path) = args.config {
         conf_path
     } else {
-        tomate::default_config_path()
-            .with_context(|| "Unable to find default config path")?
+        tomate::default_config_path().with_context(|| "Unable to find default config path")?
     };
 
-    let config = Config::init(&config_path)
-        .with_context(|| "Failed to initialize config file")?;
+    let config = Config::init(&config_path).with_context(|| "Failed to initialize config file")?;
 
     match &args.command {
         Command::Status { format } => {
@@ -118,7 +114,6 @@ fn main() -> Result<()> {
             println!();
 
             print_status(&config, None)?;
-
         }
         Command::Finish => {
             tomate::finish(&config)?;
@@ -127,7 +122,6 @@ fn main() -> Result<()> {
             tomate::clear(&config)?;
         }
         Command::Break { duration, long } => {
-
             let timer = if *long {
                 let dur = duration.unwrap_or(config.long_break_duration);
                 let timer = Timer::new(Local::now(), dur);
@@ -145,7 +139,6 @@ fn main() -> Result<()> {
 
             println!();
             print_progress_bar(&timer);
-
         }
         Command::History => {
             if !config.history_file_path.exists() {
@@ -256,7 +249,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
                 "{}",
                 "(use \"tomate finish\" to finish this break)".dimmed()
             );
-        },
+        }
         Status::LongBreak(timer) => {
             println!("Taking a long break");
             println!();
@@ -268,7 +261,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
                 "{}",
                 "(use \"tomate finish\" to finish this break)".dimmed()
             );
-        },
+        }
     }
 
     Ok(())
@@ -333,13 +326,13 @@ fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: DateTime<Local>) -> String
         .replace("%d", &pomodoro.description().unwrap_or(""))
         .replace(
             "%t",
-            &pomodoro
-                .tags()
-                .unwrap_or(&Vec::<String>::new())
-                .join(","),
+            &pomodoro.tags().unwrap_or(&Vec::<String>::new()).join(","),
         )
         .replace("%r", &to_kitchen(&pomodoro.timer().remaining(now)))
-        .replace("%R", &pomodoro.timer().remaining(now).num_seconds().to_string())
+        .replace(
+            "%R",
+            &pomodoro.timer().remaining(now).num_seconds().to_string(),
+        )
         .replace("%s", &pomodoro.timer().starts_at().to_rfc3339())
         .replace("%S", &pomodoro.timer().starts_at().timestamp().to_string())
         .replace("%e", &pomodoro.timer().ends_at().to_rfc3339())
@@ -374,7 +367,7 @@ fn print_progress_bar(pom: &Timer) {
 mod test {
     use chrono::{prelude::*, TimeDelta};
 
-    use crate::{Pomodoro, format_pomodoro};
+    use crate::{format_pomodoro, Pomodoro};
 
     #[test]
     fn pomodoro_format_wallclock() {
