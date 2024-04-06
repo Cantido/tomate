@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+[unreleased]: https://github.com/Cantido/tomate/compare/v0.1.1...HEAD
+
+## [0.2.0] - 2024-04-06
+
 ### Added
 
 - The library is now documented
@@ -24,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CLI-specific functions were moved from the core lib and into the CLI executable
 
-[unreleased]: https://github.com/Cantido/tomate/compare/v0.1.1...HEAD
+[0.2.0]: https://github.com/Cantido/tomate/compare/v0.1.1..v0.2.0
 
 ## [0.1.1] - 2024-04-05
 
