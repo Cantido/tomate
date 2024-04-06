@@ -1,10 +1,20 @@
+#![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
+
+//! A Pomodoro CLI and library
+//!
+//! Manages a set of files that describe the current Pomodoro or break,
+//! as well as a history of completed Pomodoros.
+//!
+//! All the interface functions in this module require a [`Config`] struct.
+//! You can load one from a path with [`Config::load`].
+
 use std::{fs::read_to_string, path::{Path, PathBuf}, time::SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use colored::Colorize;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use time::Timer;
 
 mod config;
 pub use config::Config;
@@ -13,17 +23,24 @@ pub use history::History;
 mod hooks;
 mod pomodoro;
 pub use pomodoro::Pomodoro;
-pub mod time;
+mod time;
+pub use time::Timer;
 
+/// Phases of the Pomodoro technique
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Status {
+    /// No Pomodoro or break is active
     Inactive,
+    /// A Pomodoro is active
     Active(Pomodoro),
+    /// A timer for a short break is active
     ShortBreak(Timer),
+    /// A timer for a long break is active
     LongBreak(Timer),
 }
 
 impl Status {
+    /// Load from a state file
     pub fn load(state_file_path: &Path) -> Result<Self> {
         if state_file_path.try_exists()? {
             let state_str = read_to_string(state_file_path)
@@ -35,6 +52,7 @@ impl Status {
         }
     }
 
+    /// Save this status as a TOML file
     pub fn save(&self, state_file_path: &Path) -> Result<()> {
         match &self {
             Self::Inactive => {
@@ -68,7 +86,7 @@ impl Status {
     }
 }
 
-
+/// Start a Pomodoro timer
 pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
     let status = Status::load(&config.state_file_path)?;
 
@@ -87,6 +105,7 @@ pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
     }
 }
 
+/// Start a short break timer
 pub fn take_short_break(config: &Config, timer: Timer) -> Result<()> {
     let status = Status::load(&config.state_file_path)?;
 
@@ -105,6 +124,7 @@ pub fn take_short_break(config: &Config, timer: Timer) -> Result<()> {
     }
 }
 
+/// Start a long break timer
 pub fn take_long_break(config: &Config, timer: Timer) -> Result<()> {
     let status = Status::load(&config.state_file_path)?;
 
@@ -123,6 +143,7 @@ pub fn take_long_break(config: &Config, timer: Timer) -> Result<()> {
     }
 }
 
+/// Get the default location of the config file
 pub fn default_config_path() -> Result<PathBuf> {
     let conf_path = ProjectDirs::from("dev", "Cosmicrose", "Tomate")
         .with_context(|| "Unable to determine XDG directories")?
@@ -132,6 +153,7 @@ pub fn default_config_path() -> Result<PathBuf> {
     Ok(conf_path)
 }
 
+/// Finish and archive a Pomodoro or break timer
 pub fn finish(config: &Config) -> Result<()> {
     let status = Status::load(&config.state_file_path)?;
 
@@ -151,6 +173,7 @@ pub fn finish(config: &Config) -> Result<()> {
     Ok(())
 }
 
+/// Clear the current state by deleting the state file
 pub fn clear(config: &Config) -> Result<()> {
     let state_file_path = &config.state_file_path;
 
@@ -167,6 +190,7 @@ pub fn clear(config: &Config) -> Result<()> {
     Ok(())
 }
 
+/// Delete the state and history files
 pub fn purge(config: &Config) -> Result<()> {
     if config.state_file_path.exists() {
         println!(

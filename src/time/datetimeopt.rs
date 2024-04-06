@@ -1,3 +1,4 @@
+#[doc(hidden)]
 pub mod unix {
     use std::time::{Duration, SystemTime};
 

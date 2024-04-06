@@ -5,20 +5,28 @@ use colored::Colorize;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+/// Global configuration values
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
+    /// Directory to find hook executables
     pub hooks_directory: PathBuf,
+    /// File describing the current Pomodoro or break timer
     pub state_file_path: PathBuf,
+    /// File describing historical Pomodoro or break timers
     pub history_file_path: PathBuf,
+    /// Default duration for Pomodoro timers
     #[serde(with = "crate::time::duration::seconds")]
     pub pomodoro_duration: Duration,
+    /// Default duration for short break timers
     #[serde(with = "crate::time::duration::seconds")]
     pub short_break_duration: Duration,
+    /// Default duration for long break timers
     #[serde(with = "crate::time::duration::seconds")]
     pub long_break_duration: Duration,
 }
 
 impl Config {
+    /// Returns the current config, creating a default config file if one does not exist
     pub fn init(config_path: &Path) -> Result<Self> {
         if let Some(conf) = Config::load(&config_path)? {
             Ok(conf)
@@ -35,7 +43,8 @@ impl Config {
         }
     }
 
-    fn load(path: &Path) -> Result<Option<Self>> {
+    /// Reads a TOML config file
+    pub fn load(path: &Path) -> Result<Option<Self>> {
         if path.exists() {
             let config_str = read_to_string(path)?;
 

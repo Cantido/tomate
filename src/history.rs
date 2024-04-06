@@ -11,12 +11,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::Pomodoro;
 
+/// A record of past Pomodoro timers
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct History {
     pomodoros: Vec<Pomodoro>,
 }
 
 impl History {
+    /// Load the history from a TOML file
     pub fn load(path: &Path) -> Result<Self> {
         if !path.try_exists()? {
             return Ok(Self::default());
@@ -28,10 +30,12 @@ impl History {
             .with_context(|| "Failed to parse history file")
     }
 
+    /// Get the list of historical Pomodoros
     pub fn pomodoros(&self) -> &Vec<Pomodoro> {
         &self.pomodoros
     }
 
+    /// Append a new Pomodoro to a history file
     pub fn append(pomodoro: &Pomodoro, history_file_path: &Path) -> Result<()> {
         println!(
             "Archiving Pomodoro to {}",

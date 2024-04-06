@@ -8,8 +8,7 @@ use colored::Colorize;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 
 use regex::Regex;
-use tomate::{Config, History, Pomodoro, Status};
-use tomate::time::Timer;
+use tomate::{Config, History, Pomodoro, Status, Timer};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -162,7 +161,7 @@ fn main() -> Result<()> {
             for pom in history.pomodoros().iter() {
                 let starts_at: DateTime<Local> = pom.timer().starts_at().into();
                 let date = starts_at.format("%d %b %R").to_string();
-                let dur = tomate::time::duration::to_human(&pom.timer().duration());
+                let dur = to_human(&pom.timer().duration());
                 let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
                 let desc = pom.description().clone().unwrap_or("-");
 
@@ -200,7 +199,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     match status {
         Status::Active(pom) => {
             if let Some(format) = format {
-                println!("{}", pom.format(&format, SystemTime::now()));
+                println!("{}", format_pomodoro(&pom, &format, SystemTime::now()));
 
                 return Ok(());
             }
@@ -216,7 +215,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
             } else {
                 println!("Status: {}", "Active".magenta().bold());
             }
-            println!("Duration: {}", tomate::time::duration::to_human(&pom.timer().duration()).cyan());
+            println!("Duration: {}", to_human(&pom.timer().duration()).cyan());
             if let Some(tags) = pom.tags() {
                 println!("Tags:");
                 for tag in tags {
@@ -285,6 +284,64 @@ fn duration_from_human(input: &str) -> Result<Duration> {
     Ok(Duration::new(total_seconds, 0))
 }
 
+fn to_human(duration: &Duration) -> String {
+    use std::fmt::Write;
+
+    if duration.is_zero() {
+        return "0s".to_string();
+    }
+
+    let hours = duration.as_secs() / 3600;
+    let minutes = (duration.as_secs() / 60) - (hours * 60);
+    let seconds = duration.as_secs() % 60;
+
+    let mut acc = String::new();
+
+    if hours > 0 {
+        write!(acc, "{}h", hours).unwrap();
+    }
+
+    if minutes > 0 {
+        write!(acc, "{}m", minutes).unwrap();
+    }
+
+    if seconds > 0 {
+        write!(acc, "{}s", seconds).unwrap();
+    }
+
+    acc
+}
+
+pub fn to_kitchen(duration: &Duration) -> String {
+    let hours = duration.as_secs() / 3600;
+    let minutes = (duration.as_secs() / 60) - (hours * 60);
+    let seconds = duration.as_secs() % 60;
+
+    if hours > 0 {
+        format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+    } else {
+        format!("{:02}:{:02}", minutes, seconds)
+    }
+}
+
+fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: SystemTime) -> String {
+    let output = f
+        .replace("%d", &pomodoro.description().unwrap_or(""))
+        .replace(
+            "%t",
+            &pomodoro
+                .tags()
+                .unwrap_or(&Vec::<String>::new())
+                .join(","),
+        )
+        .replace("%r", &to_kitchen(&pomodoro.timer().remaining(now)))
+        .replace("%R", &pomodoro.timer().remaining(now).as_secs().to_string())
+        .replace("%S", &pomodoro.timer().starts_at().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string())
+        .replace("%E", &pomodoro.timer().ends_at().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
+
+    output
+}
+
 fn print_progress_bar(pom: &Timer) {
     let now = SystemTime::now();
     let elapsed_ratio =
@@ -300,10 +357,10 @@ fn print_progress_bar(pom: &Timer) {
 
     println!(
         "{} {}{} {}",
-        tomate::time::duration::to_kitchen(&pom.elapsed(now)),
+        to_kitchen(&pom.elapsed(now)),
         filled_bar,
         unfilled_bar,
-        tomate::time::duration::to_kitchen(&pom.remaining(now)),
+        to_kitchen(&pom.remaining(now)),
     );
 }
 
