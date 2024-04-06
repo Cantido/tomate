@@ -336,10 +336,18 @@ fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: SystemTime) -> String {
         )
         .replace("%r", &to_kitchen(&pomodoro.timer().remaining(now)))
         .replace("%R", &pomodoro.timer().remaining(now).as_secs().to_string())
+        .replace("%s", &systime_to_datetime(&pomodoro.timer().starts_at()).to_rfc3339())
         .replace("%S", &pomodoro.timer().starts_at().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string())
+        .replace("%e", &systime_to_datetime(&pomodoro.timer().ends_at()).to_rfc3339())
         .replace("%E", &pomodoro.timer().ends_at().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string());
 
     output
+}
+
+fn systime_to_datetime(dt: &SystemTime) -> DateTime<Local> {
+    let ts = dt.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+
+    Local.timestamp_millis_opt(ts.try_into().unwrap()).unwrap()
 }
 
 fn print_progress_bar(pom: &Timer) {
