@@ -10,7 +10,7 @@
 //! Check out that struct's documentation for default values and functions
 //! for loading and saving a configuration.
 
-use std::{fs::{read_to_string, OpenOptions}, io::{Read, Write}, path::Path, time::SystemTime};
+use std::{fs::OpenOptions, io::{Read, Write}, path::Path, time::SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use colored::Colorize;
