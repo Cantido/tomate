@@ -1,27 +1,26 @@
 #[doc(hidden)]
 pub mod unix {
-    use std::time::{Duration, SystemTime};
-
+    use chrono::prelude::*;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<SystemTime>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Local>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let ts: Option<u64> = Deserialize::deserialize(deserializer)?;
+        let ts: Option<i64> = Deserialize::deserialize(deserializer)?;
 
         match ts {
-            Some(ts) => Ok(Some(SystemTime::UNIX_EPOCH + Duration::from_secs(ts))),
+            Some(ts) => Ok(Some(Local.timestamp_opt(ts, 0).unwrap())),
             None => Ok(None),
         }
     }
 
-    pub fn serialize<S>(dt: &Option<SystemTime>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(dt: &Option<DateTime<Local>>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match dt {
-            Some(ref dt) => serializer.serialize_some(&dt.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()),
+            Some(ref dt) => serializer.serialize_some(&dt.timestamp()),
             None => serializer.serialize_none(),
         }
     }

@@ -1,6 +1,6 @@
 use std::time::Duration;
-use std::time::SystemTime;
 
+use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use crate::time::Timer;
 
@@ -12,12 +12,12 @@ pub struct Pomodoro {
     description: Option<String>,
     tags: Option<Vec<String>>,
     #[serde(default, with = "crate::time::datetimeopt::unix")]
-    finished_at: Option<SystemTime>,
+    finished_at: Option<DateTime<Local>>,
 }
 
 impl Pomodoro {
     /// Create a new timer
-    pub fn new(starts_at: SystemTime, duration: Duration) -> Self {
+    pub fn new(starts_at: DateTime<Local>, duration: Duration) -> Self {
         let timer = Timer::new(starts_at, duration);
         Self {
             timer,
@@ -53,7 +53,7 @@ impl Pomodoro {
     }
 
     /// Stop running this timer
-    pub fn finish(&mut self, now: SystemTime) {
+    pub fn finish(&mut self, now: DateTime<Local>) {
         self.finished_at = Some(now);
     }
 }

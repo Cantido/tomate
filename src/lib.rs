@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
@@ -11,8 +12,14 @@
 //! for loading and saving a configuration.
 
 use std::{fs::OpenOptions, io::{Read, Write}, path::Path, time::SystemTime};
+||||||| 2f4739a (Remove Chrono from lib)
+use std::{fs::read_to_string, path::{Path, PathBuf}, time::SystemTime};
+=======
+use std::{fs::read_to_string, path::{Path, PathBuf}};
+>>>>>>> parent of 2f4739a (Remove Chrono from lib)
 
 use anyhow::{anyhow, bail, Context, Result};
+use chrono::prelude::*;
 use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -178,7 +185,7 @@ pub fn finish(config: &Config) -> Result<()> {
         Status::ShortBreak(_timer) => clear(config)?,
         Status::LongBreak(_timer) => clear(config)?,
         Status::Active(mut pom) => {
-            pom.finish(SystemTime::now());
+            pom.finish(Local::now());
 
             History::append(&pom, &config.history_file_path)?;
 
@@ -229,14 +236,14 @@ pub fn purge(config: &Config) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use std::time::{Duration, SystemTime};
+    use chrono::{prelude::*, TimeDelta};
 
     use crate::{Pomodoro, Status};
 
     #[test]
     fn status_to_toml() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
+        let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+        let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
         let mut pom = Pomodoro::new(dt, dur);
         pom.set_description("test converting poms to toml");
@@ -266,8 +273,8 @@ tags = ["work", "fun"]
         )
         .expect("Could not parse pomodoro from string");
 
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1712346817);
-        let dur = Duration::new(25 * 60, 0);
+        let dt: DateTime<Local> = "2024-04-05T13:53:37-06:00".parse().unwrap();
+        let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
         assert_eq!(pom.timer().starts_at(), dt);
         assert_eq!(pom.timer().duration(), dur);
@@ -278,26 +285,26 @@ tags = ["work", "fun"]
 
     #[test]
     fn time_elapsed() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dt_later: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400 + (20 * 60));
-        let dur = Duration::new(25 * 60, 0);
+        let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+        let dt_later: DateTime<Local> = "2024-03-27T12:20:00-06:00".parse().unwrap();
+        let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
         let pom = Pomodoro::new(dt, dur);
 
-        let expected_elapsed = Duration::new(20 * 60, 0);
+        let expected_elapsed = TimeDelta::new(20 * 60, 0).unwrap();
 
         assert_eq!(pom.timer().elapsed(dt_later), expected_elapsed);
     }
 
     #[test]
     fn time_remaining() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dt_later: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400 + (20 * 60));
-        let dur = Duration::new(25 * 60, 0);
+        let dt: DateTime<Local> = "2024-03-27T12:00:00-06:00".parse().unwrap();
+        let dt_later: DateTime<Local> = "2024-03-27T12:20:00-06:00".parse().unwrap();
+        let dur = TimeDelta::new(25 * 60, 0).unwrap();
 
         let pom = Pomodoro::new(dt, dur);
 
-        let expected_remaining = Duration::new(5 * 60, 0);
+        let expected_remaining = TimeDelta::new(5 * 60, 0).unwrap();
 
         assert_eq!(pom.timer().remaining(dt_later), expected_remaining);
     }
