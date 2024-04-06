@@ -75,7 +75,7 @@ impl Status {
                     "Deleting current Pomodoro state file {}",
                     &state_file_path.display().to_string().cyan()
                 );
-                std::fs::remove_file(&state_file_path)?;
+                std::fs::remove_file(state_file_path)?;
                 Ok(())
             }
             _ => {
@@ -119,7 +119,7 @@ impl Status {
         let contents = toml::to_string(&self).with_context(|| "Unable to serialize Pomodoro")?;
 
         writer
-            .write_all(&contents.as_bytes())
+            .write_all(contents.as_bytes())
             .with_context(|| "Unable to save Pomodoro to writer")
     }
 }

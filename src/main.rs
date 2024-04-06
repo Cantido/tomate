@@ -104,7 +104,7 @@ fn main() -> Result<()> {
             }
 
             if let Some(tags) = tags {
-                let tags: Vec<String> = tags.split(",").map(|s| s.to_string()).collect();
+                let tags: Vec<String> = tags.split(',').map(|s| s.to_string()).collect();
 
                 pom.set_tags(tags);
             }
@@ -159,8 +159,8 @@ fn main() -> Result<()> {
             for pom in history.pomodoros().iter() {
                 let date = pom.timer().starts_at().format("%d %b %R").to_string();
                 let dur = to_human(&pom.timer().duration());
-                let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
-                let desc = pom.description().clone().unwrap_or("-");
+                let tags = pom.tags().unwrap_or(&["-".to_string()]).join(",");
+                let desc = pom.description().unwrap_or("-");
 
                 table.add_row(Row::new(vec![
                     Cell::new(&date).with_style(Attr::ForegroundColor(color::BLUE)),
@@ -168,7 +168,7 @@ fn main() -> Result<()> {
                         .style_spec("r")
                         .with_style(Attr::ForegroundColor(color::CYAN)),
                     Cell::new(&tags),
-                    Cell::new(&desc),
+                    Cell::new(desc),
                 ]));
             }
             table.set_format(*format::consts::FORMAT_CLEAN);
@@ -221,7 +221,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
             }
             println!();
 
-            print_progress_bar(&pom.timer());
+            print_progress_bar(pom.timer());
             println!();
             println!(
                 "{}",
@@ -269,7 +269,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
 
 fn duration_from_human(input: &str) -> Result<TimeDelta> {
     let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$").unwrap();
-    let caps = re.captures(&input)
+    let caps = re.captures(input)
     .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
 
     let hours: i64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
@@ -323,7 +323,7 @@ pub fn to_kitchen(duration: &TimeDelta) -> String {
 
 fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: DateTime<Local>) -> String {
     let output = f
-        .replace("%d", &pomodoro.description().unwrap_or(""))
+        .replace("%d", pomodoro.description().unwrap_or(""))
         .replace(
             "%t",
             &pomodoro.tags().unwrap_or(&Vec::<String>::new()).join(","),

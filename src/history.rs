@@ -48,7 +48,7 @@ impl History {
             .create(true)
             .write(true)
             .append(true)
-            .open(&history_file_path)?;
+            .open(history_file_path)?;
 
         let pom_str = toml::to_string(&pomodoro)?;
         writeln!(history_file, "[[pomodoros]]\n{}", pom_str)?;

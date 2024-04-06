@@ -79,7 +79,7 @@ pub struct Config {
 impl Config {
     /// Returns the current config, creating a default config file if one does not exist
     pub fn init(config_path: &Path) -> Result<Self> {
-        if let Some(conf) = Config::load(&config_path)? {
+        if let Some(conf) = Config::load(config_path)? {
             Ok(conf)
         } else {
             let conf = Config::default();
@@ -89,7 +89,7 @@ impl Config {
                 config_path.display().to_string().cyan()
             );
 
-            conf.save(&config_path)
+            conf.save(config_path)
                 .with_context(|| format!("Unable to save config to {}", config_path.display()))?;
 
             Ok(conf)
@@ -118,7 +118,7 @@ impl Config {
     pub fn save(&self, path: &Path) -> Result<()> {
         let toml = toml::to_string(&self).with_context(|| "Unable to format config as TOML")?;
 
-        std::fs::write(&path, toml)
+        std::fs::write(path, toml)
             .with_context(|| format!("Unable to write config TOML to path {}", path.display()))
     }
 }
