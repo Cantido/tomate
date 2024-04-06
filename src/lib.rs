@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
@@ -11,12 +10,7 @@
 //! Check out that struct's documentation for default values and functions
 //! for loading and saving a configuration.
 
-use std::{fs::OpenOptions, io::{Read, Write}, path::Path, time::SystemTime};
-||||||| 2f4739a (Remove Chrono from lib)
-use std::{fs::read_to_string, path::{Path, PathBuf}, time::SystemTime};
-=======
-use std::{fs::read_to_string, path::{Path, PathBuf}};
->>>>>>> parent of 2f4739a (Remove Chrono from lib)
+use std::{fs::OpenOptions, io::{Read, Write}, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::prelude::*;

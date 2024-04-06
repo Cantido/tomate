@@ -1,21 +1,20 @@
 #[doc(hidden)]
 pub mod seconds {
-    use std::time::Duration;
-
+    use chrono::TimeDelta;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<TimeDelta, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let sec: u64 = Deserialize::deserialize(deserializer)?;
-        Ok(Duration::new(sec, 0))
+        let sec: i64 = Deserialize::deserialize(deserializer)?;
+        Ok(TimeDelta::new(sec, 0).unwrap())
     }
 
-    pub fn serialize<S>(delta: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(delta: &TimeDelta, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_u64(delta.as_secs())
+        serializer.serialize_i64(delta.num_seconds())
     }
 }

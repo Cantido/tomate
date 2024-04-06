@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use chrono::prelude::*;
+use chrono::{prelude::*, TimeDelta};
 use serde::{Deserialize, Serialize};
 use crate::time::Timer;
 
@@ -17,7 +15,7 @@ pub struct Pomodoro {
 
 impl Pomodoro {
     /// Create a new timer
-    pub fn new(starts_at: DateTime<Local>, duration: Duration) -> Self {
+    pub fn new(starts_at: DateTime<Local>, duration: TimeDelta) -> Self {
         let timer = Timer::new(starts_at, duration);
         Self {
             timer,

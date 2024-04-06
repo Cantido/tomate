@@ -1,7 +1,8 @@
-use std::{fs::read_to_string, path::{Path, PathBuf}, time::Duration};
+use std::{fs::read_to_string, path::{Path, PathBuf}};
 
 use anyhow::{Context, Result};
 use colored::Colorize;
+use chrono::TimeDelta;
 use directories::ProjectDirs;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -48,19 +49,19 @@ pub struct Config {
     /// Default is 25 minutes (1500 seconds).
     /// Serialized as an integer count of seconds.
     #[serde(default = "default_pomodoro_duration", with = "crate::time::duration::seconds")]
-    pub pomodoro_duration: Duration,
+    pub pomodoro_duration: TimeDelta,
     /// Default duration for short break timers
     ///
     /// Default is 5 minutes (300 seconds).
     /// Serialized as an integer count of seconds.
     #[serde(default = "default_short_break_duration", with = "crate::time::duration::seconds")]
-    pub short_break_duration: Duration,
+    pub short_break_duration: TimeDelta,
     /// Default duration for long break timers
     ///
     /// Default is 20 minutes (1200 seconds).
     /// Serialized as an integer count of seconds.
     #[serde(default = "default_long_break_duration", with = "crate::time::duration::seconds")]
-    pub long_break_duration: Duration,
+    pub long_break_duration: TimeDelta,
 }
 
 impl Config {
@@ -160,16 +161,16 @@ fn default_history_path() -> PathBuf {
         .join("history.toml")
 }
 
-fn default_pomodoro_duration() -> Duration {
-    Duration::from_secs(25 * 60)
+fn default_pomodoro_duration() -> TimeDelta {
+    TimeDelta::new(25 * 60, 0).unwrap()
 }
 
-fn default_short_break_duration() -> Duration {
-    Duration::from_secs(5 * 60)
+fn default_short_break_duration() -> TimeDelta {
+    TimeDelta::new(5 * 60, 0).unwrap()
 }
 
-fn default_long_break_duration() -> Duration {
-    Duration::from_secs(20 * 60)
+fn default_long_break_duration() -> TimeDelta {
+    TimeDelta::new(20 * 60, 0).unwrap()
 }
 
 

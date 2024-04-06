@@ -4,8 +4,6 @@ mod datetime;
 #[doc(hidden)]
 pub mod datetimeopt;
 
-use std::time::Duration;
-
 use chrono::{prelude::*, TimeDelta};
 use serde::{Deserialize, Serialize};
 
@@ -15,12 +13,12 @@ pub struct Timer {
     #[serde(with = "crate::time::datetime::unix")]
     started_at: DateTime<Local>,
     #[serde(with = "crate::time::duration::seconds")]
-    duration: Duration,
+    duration: TimeDelta,
 }
 
 impl Timer {
     /// Create a new timer
-    pub fn new(started_at: DateTime<Local>, duration: Duration) -> Self {
+    pub fn new(started_at: DateTime<Local>, duration: TimeDelta) -> Self {
         Self {
             started_at,
             duration,
@@ -38,17 +36,18 @@ impl Timer {
     }
 
     /// Get the length of time that this timer was set for
-    pub fn duration(&self) -> Duration {
+    pub fn duration(&self) -> TimeDelta {
         self.duration
     }
 
     /// Get the amount of time that has passed since this timer started
-    pub fn elapsed(&self, now: DateTime<Local>) -> Duration {
-        (now - self.started_at).clamp(TimeDelta::zero(), TimeDelta::from_std(self.duration).unwrap()).to_std().unwrap()
+    pub fn elapsed(&self, now: DateTime<Local>) -> TimeDelta {
+        (now - self.started_at).clamp(TimeDelta::zero(), self.duration)
     }
 
-    pub fn remaining(&self, now: DateTime<Local>) -> Duration {
-        (self.duration - self.elapsed(now)).clamp(Duration::ZERO, self.duration)
+    /// Get the amount of time left on this timer
+    pub fn remaining(&self, now: DateTime<Local>) -> TimeDelta {
+        (self.duration - self.elapsed(now)).clamp(TimeDelta::zero(), self.duration)
     }
 
     /// Check if this timer's duration has run out
@@ -56,3 +55,4 @@ impl Timer {
         now > self.ends_at()
     }
 }
+

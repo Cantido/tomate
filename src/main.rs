@@ -1,8 +1,7 @@
 use std::path::PathBuf;
-use std::time::Duration;
 
 use anyhow::{Context, Result};
-use chrono::prelude::*;
+use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use prettytable::{color, format, Attr, Cell, Row, Table};
@@ -49,7 +48,7 @@ enum Command {
     Start {
         /// Length of the Pomodoro to start
         #[arg(short, long, value_parser = duration_from_human)]
-        duration: Option<Duration>,
+        duration: Option<TimeDelta>,
         /// Description of the task you're focusing on
         description: Option<String>,
         /// Tags to categorize the work you're doing, comma-separated
@@ -64,7 +63,7 @@ enum Command {
     Break {
         /// Length of the break to start
         #[arg(short, long, value_parser = duration_from_human)]
-        duration: Option<Duration>,
+        duration: Option<TimeDelta>,
         /// Take a long break instead of a short break
         #[arg(short, long, default_value_t = false)]
         long: bool,
@@ -165,18 +164,8 @@ fn main() -> Result<()> {
             ]));
 
             for pom in history.pomodoros().iter() {
-<<<<<<< HEAD
-                let starts_at: DateTime<Local> = pom.timer().starts_at().into();
-                let date = starts_at.format("%d %b %R").to_string();
-                let dur = to_human(&pom.timer().duration());
-||||||| 2f4739a (Remove Chrono from lib)
-                let starts_at: DateTime<Local> = pom.timer().starts_at().into();
-                let date = starts_at.format("%d %b %R").to_string();
-                let dur = tomate::time::duration::to_human(&pom.timer().duration());
-=======
                 let date = pom.timer().starts_at().format("%d %b %R").to_string();
-                let dur = tomate::time::duration::to_human(&pom.timer().duration());
->>>>>>> parent of 2f4739a (Remove Chrono from lib)
+                let dur = to_human(&pom.timer().duration());
                 let tags = pom.tags().clone().unwrap_or(&["-".to_string()]).join(",");
                 let desc = pom.description().clone().unwrap_or("-");
 
@@ -214,13 +203,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     match status {
         Status::Active(pom) => {
             if let Some(format) = format {
-<<<<<<< HEAD
-                println!("{}", format_pomodoro(&pom, &format, SystemTime::now()));
-||||||| 2f4739a (Remove Chrono from lib)
-                println!("{}", pom.format(&format, SystemTime::now()));
-=======
-                println!("{}", pom.format(&format, Local::now()));
->>>>>>> parent of 2f4739a (Remove Chrono from lib)
+                println!("{}", format_pomodoro(&pom, &format, Local::now()));
 
                 return Ok(());
             }
@@ -291,30 +274,30 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn duration_from_human(input: &str) -> Result<Duration> {
+fn duration_from_human(input: &str) -> Result<TimeDelta> {
     let re = Regex::new(r"^(?:([0-9])h)?(?:([0-9]+)m)?(?:([0-9]+)s)?$").unwrap();
     let caps = re.captures(&input)
     .with_context(|| "Failed to parse duration string, format is <HOURS>h<MINUTES>m<SECONDS>s (each section is optional) example: 22m30s")?;
 
-    let hours: u64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
-    let minutes: u64 = caps.get(2).map_or("0", |c| c.as_str()).parse()?;
-    let seconds: u64 = caps.get(3).map_or("0", |c| c.as_str()).parse()?;
+    let hours: i64 = caps.get(1).map_or("0", |c| c.as_str()).parse()?;
+    let minutes: i64 = caps.get(2).map_or("0", |c| c.as_str()).parse()?;
+    let seconds: i64 = caps.get(3).map_or("0", |c| c.as_str()).parse()?;
 
     let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
 
-    Ok(Duration::new(total_seconds, 0))
+    Ok(TimeDelta::new(total_seconds, 0).expect("Expected duration to be within valid range"))
 }
 
-fn to_human(duration: &Duration) -> String {
+fn to_human(duration: &TimeDelta) -> String {
     use std::fmt::Write;
 
     if duration.is_zero() {
         return "0s".to_string();
     }
 
-    let hours = duration.as_secs() / 3600;
-    let minutes = (duration.as_secs() / 60) - (hours * 60);
-    let seconds = duration.as_secs() % 60;
+    let hours = duration.num_seconds() / 3600;
+    let minutes = (duration.num_seconds() / 60) - (hours * 60);
+    let seconds = duration.num_seconds() % 60;
 
     let mut acc = String::new();
 
@@ -333,10 +316,10 @@ fn to_human(duration: &Duration) -> String {
     acc
 }
 
-pub fn to_kitchen(duration: &Duration) -> String {
-    let hours = duration.as_secs() / 3600;
-    let minutes = (duration.as_secs() / 60) - (hours * 60);
-    let seconds = duration.as_secs() % 60;
+pub fn to_kitchen(duration: &TimeDelta) -> String {
+    let hours = duration.num_seconds() / 3600;
+    let minutes = (duration.num_seconds() / 60) - (hours * 60);
+    let seconds = duration.num_seconds() % 60;
 
     if hours > 0 {
         format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
@@ -345,7 +328,7 @@ pub fn to_kitchen(duration: &Duration) -> String {
     }
 }
 
-fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: SystemTime) -> String {
+fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: DateTime<Local>) -> String {
     let output = f
         .replace("%d", &pomodoro.description().unwrap_or(""))
         .replace(
@@ -356,29 +339,19 @@ fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: SystemTime) -> String {
                 .join(","),
         )
         .replace("%r", &to_kitchen(&pomodoro.timer().remaining(now)))
-        .replace("%R", &pomodoro.timer().remaining(now).as_secs().to_string())
-        .replace("%s", &systime_to_datetime(&pomodoro.timer().starts_at()).to_rfc3339())
-        .replace("%S", &systime_to_unix(&pomodoro.timer().starts_at()).to_string())
-        .replace("%e", &systime_to_datetime(&pomodoro.timer().ends_at()).to_rfc3339())
-        .replace("%E", &systime_to_unix(&pomodoro.timer().ends_at()).to_string());
+        .replace("%R", &pomodoro.timer().remaining(now).num_seconds().to_string())
+        .replace("%s", &pomodoro.timer().starts_at().to_rfc3339())
+        .replace("%S", &pomodoro.timer().starts_at().timestamp().to_string())
+        .replace("%e", &pomodoro.timer().ends_at().to_rfc3339())
+        .replace("%E", &pomodoro.timer().ends_at().timestamp().to_string());
 
     output
-}
-
-fn systime_to_unix(dt: &SystemTime) -> u64 {
-    dt.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
-}
-
-fn systime_to_datetime(dt: &SystemTime) -> DateTime<Local> {
-    let ts = dt.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
-
-    Local.timestamp_millis_opt(ts.try_into().unwrap()).unwrap()
 }
 
 fn print_progress_bar(pom: &Timer) {
     let now = Local::now();
     let elapsed_ratio =
-        pom.elapsed(now).as_millis() as f32 / pom.duration().as_millis() as f32;
+        pom.elapsed(now).num_milliseconds() as f32 / pom.duration().num_milliseconds() as f32;
 
     let bar_width = 40.0;
 
@@ -399,7 +372,7 @@ fn print_progress_bar(pom: &Timer) {
 
 #[cfg(test)]
 mod test {
-    use std::time::{Duration, SystemTime};
+    use chrono::{prelude::*, TimeDelta};
 
     use crate::{Pomodoro, format_pomodoro};
 
@@ -410,7 +383,7 @@ mod test {
 
         let pom = Pomodoro::new(dt, dur);
 
-        let actual_format = pom.format("%r", dt);
+        let actual_format = format_pomodoro(&pom, "%r", dt);
 
         assert_eq!(actual_format, "25:00");
     }
@@ -423,7 +396,7 @@ mod test {
         let mut pom = Pomodoro::new(dt, dur);
         pom.set_description("hello :)");
 
-        let actual_format = pom.format("%d", dt);
+        let actual_format = format_pomodoro(&pom, "%d", dt);
 
         assert_eq!(actual_format, "hello :)");
     }
@@ -435,7 +408,7 @@ mod test {
 
         let pom = Pomodoro::new(dt, dur);
 
-        let actual_format = pom.format("%R", dt);
+        let actual_format = format_pomodoro(&pom, "%R", dt);
 
         assert_eq!(actual_format, "1500");
     }
@@ -447,7 +420,7 @@ mod test {
 
         let pom = Pomodoro::new(dt, dur);
 
-        let actual_format = pom.format("%s", dt);
+        let actual_format = format_pomodoro(&pom, "%s", dt);
 
         assert_eq!(actual_format, "2024-03-27T12:00:00-06:00");
     }
@@ -459,7 +432,7 @@ mod test {
 
         let pom = Pomodoro::new(dt, dur);
 
-        let actual_format = pom.format("%S", dt);
+        let actual_format = format_pomodoro(&pom, "%S", dt);
 
         assert_eq!(actual_format, "1711562400");
     }
@@ -472,7 +445,7 @@ mod test {
         let mut pom = Pomodoro::new(dt, dur);
         pom.set_tags(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 
-        let actual_format = pom.format("%t", dt);
+        let actual_format = format_pomodoro(&pom, "%t", dt);
 
         assert_eq!(actual_format, "a,b,c");
     }
@@ -484,7 +457,7 @@ mod test {
 
         let pom = Pomodoro::new(dt, dur);
 
-        let actual_format = pom.format("%e", dt);
+        let actual_format = format_pomodoro(&pom, "%e", dt);
 
         assert_eq!(actual_format, "2024-03-27T12:25:00-06:00");
     }
@@ -496,9 +469,8 @@ mod test {
 
         let pom = Pomodoro::new(dt, dur);
 
-        let actual_format = pom.format("%E", dt);
+        let actual_format = format_pomodoro(&pom, "%E", dt);
 
         assert_eq!(actual_format, "1711563900");
     }
-}
 }
