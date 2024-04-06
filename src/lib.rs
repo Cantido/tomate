@@ -14,6 +14,7 @@ use std::{fs::OpenOptions, io::{Read, Write}, path::Path, time::SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use colored::Colorize;
+use log::info;
 use serde::{Deserialize, Serialize};
 
 mod config;
@@ -66,7 +67,7 @@ impl Status {
     pub fn save(&self, state_file_path: &Path) -> Result<()> {
         match &self {
             Self::Inactive => {
-                println!(
+                info!(
                     "Deleting current Pomodoro state file {}",
                     &state_file_path.display().to_string().cyan()
                 );
@@ -75,7 +76,7 @@ impl Status {
             },
             _ => {
                 if !state_file_path.try_exists()? {
-                    println!(
+                    info!(
                         "Creating Pomodoro state file {}",
                         &state_file_path.display().to_string().cyan()
                     );
@@ -86,8 +87,11 @@ impl Status {
                 std::fs::create_dir_all(state_file_dir)
                     .with_context(|| "Failed to create directory for state file")?;
 
-                let file = OpenOptions::new().read(true).write(true).truncate(true).open(state_file_path)?;
-                self.to_writer(file)?;
+                let file = OpenOptions::new().create(true).read(true).write(true).truncate(true).open(state_file_path)
+                    .with_context(|| format!("Unable to open state file {}", state_file_path.display()))?;
+
+                self.to_writer(file)
+                    .with_context(|| format!("Failed to save Pomodoro to {}", state_file_path.display()))?;
 
                 Ok(())
             },
@@ -117,7 +121,8 @@ pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
         Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
         Status::Inactive => {
             let next_status = Status::Active(pomodoro);
-            next_status.save(&config.state_file_path)?;
+            next_status.save(&config.state_file_path)
+                .with_context(|| "Unable to save new Pomodoro")?;
 
             hooks::run_start_hook(&config.hooks_directory)?;
 
@@ -189,7 +194,7 @@ pub fn clear(config: &Config) -> Result<()> {
     let state_file_path = &config.state_file_path;
 
     if state_file_path.exists() {
-        println!(
+        info!(
             "Deleting current Pomodoro state file {}",
             &config.state_file_path.display().to_string().cyan()
         );
@@ -204,7 +209,7 @@ pub fn clear(config: &Config) -> Result<()> {
 /// Delete the state and history files
 pub fn purge(config: &Config) -> Result<()> {
     if config.state_file_path.exists() {
-        println!(
+        info!(
             "Removing current Pomodoro file at {}",
             config.state_file_path.display().to_string().cyan()
         );
@@ -212,7 +217,7 @@ pub fn purge(config: &Config) -> Result<()> {
     }
 
     if config.history_file_path.exists() {
-        println!(
+        info!(
             "Removing history file at {}",
             config.history_file_path.display().to_string().cyan()
         );

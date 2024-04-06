@@ -7,6 +7,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
+use log::info;
 use serde::{Deserialize, Serialize};
 
 use crate::Pomodoro;
@@ -37,7 +38,7 @@ impl History {
 
     /// Append a new Pomodoro to a history file
     pub fn append(pomodoro: &Pomodoro, history_file_path: &Path) -> Result<()> {
-        println!(
+        info!(
             "Archiving Pomodoro to {}",
             &history_file_path.display().to_string().cyan()
         );

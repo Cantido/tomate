@@ -3,6 +3,7 @@ use std::{fs::read_to_string, path::{Path, PathBuf}, time::Duration};
 use anyhow::{Context, Result};
 use colored::Colorize;
 use directories::ProjectDirs;
+use log::info;
 use serde::{Deserialize, Serialize};
 
 /// Global configuration values
@@ -70,12 +71,13 @@ impl Config {
         } else {
             let conf = Config::default();
 
-            println!(
+            info!(
                 "Creating config file at {}",
                 config_path.display().to_string().cyan()
             );
 
-            conf.save(&config_path)?;
+            conf.save(&config_path)
+                .with_context(|| format!("Unable to save config to {}", config_path.display()))?;
 
             Ok(conf)
         }
@@ -90,7 +92,8 @@ impl Config {
     /// Reads a TOML config file
     pub fn load(path: &Path) -> Result<Option<Self>> {
         if path.exists() {
-            let config_str = read_to_string(path)?;
+            let config_str = read_to_string(path)
+                .with_context(|| format!("Failed to read {}", path.display()))?;
 
             toml::from_str(&config_str).with_context(|| "Failed to parse config from TOML")
         } else {

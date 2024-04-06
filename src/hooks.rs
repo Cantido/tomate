@@ -2,12 +2,13 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
+use log::info;
 
 pub fn run_start_hook(hooks_directory: &Path) -> Result<()> {
     let start_hook_path = hooks_directory.join("start");
 
     if start_hook_path.exists() {
-        println!(
+        info!(
             "Executing start hook at {}",
             start_hook_path.display().to_string().cyan()
         );
@@ -24,7 +25,7 @@ pub fn run_stop_hook(hooks_directory: &Path) -> Result<()> {
     let stop_hook_path = hooks_directory.join("stop");
 
     if stop_hook_path.exists() {
-        println!(
+        info!(
             "Executing stop hook at {}",
             stop_hook_path.display().to_string().cyan()
         );
@@ -41,7 +42,7 @@ pub fn run_break_hook(hooks_directory: &Path) -> Result<()> {
     let break_hook_path = hooks_directory.join("break");
 
     if break_hook_path.exists() {
-        println!(
+        info!(
             "Executing break hook at {}",
             break_hook_path.display().to_string().cyan()
         );

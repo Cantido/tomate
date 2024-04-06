@@ -76,15 +76,21 @@ enum Command {
 }
 
 fn main() -> Result<()> {
+    env_logger::builder()
+        .format_timestamp(None)
+        .init();
+
     let args = Args::parse();
 
     let config_path = if let Some(conf_path) = args.config {
         conf_path
     } else {
-        tomate::default_config_path()?
+        tomate::default_config_path()
+            .with_context(|| "Unable to find default config path")?
     };
 
-    let config = Config::init(&config_path)?;
+    let config = Config::init(&config_path)
+        .with_context(|| "Failed to initialize config file")?;
 
     match &args.command {
         Command::Status { format } => {
