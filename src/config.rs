@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The configuration file is written as a TOML file.
 /// See the documentation for each field to learn how they are serialized.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize, Serialize)]
 pub struct Config {
     /// Directory to find hook executables
     ///

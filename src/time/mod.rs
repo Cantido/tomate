@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 
 /// Like a kitchen timer
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct Timer {
     #[serde(with = "crate::time::datetime::unix")]
     started_at: SystemTime,

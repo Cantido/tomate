@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::Pomodoro;
 
 /// A record of past Pomodoro timers
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct History {
     pomodoros: Vec<Pomodoro>,
 }
@@ -60,4 +60,3 @@ impl History {
         Ok(())
     }
 }
-

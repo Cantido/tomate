@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::time::Timer;
 
 /// A Pomodoro timer
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct Pomodoro {
     #[serde(flatten)]
     timer: Timer,

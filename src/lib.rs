@@ -26,7 +26,7 @@ mod time;
 pub use time::Timer;
 
 /// Phases of the Pomodoro technique
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize, Serialize)]
 pub enum Status {
     /// No Pomodoro or break is active
     Inactive,
