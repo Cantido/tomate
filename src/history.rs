@@ -46,7 +46,6 @@ impl History {
 
         let mut history_file = OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(history_file_path)?;
 
