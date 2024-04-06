@@ -43,12 +43,22 @@ impl Timer {
 
     /// Get the amount of time that has passed since this timer started
     pub fn elapsed(&self, now: SystemTime) -> Duration {
-        now.duration_since(self.started_at).unwrap()
+        if self.started_at < now {
+            now.duration_since(self.started_at).unwrap().clamp(Duration::ZERO, self.duration)
+        } else {
+            Duration::ZERO
+        }
     }
 
     /// Get the amount of time remaining before this timer expires
     pub fn remaining(&self, now: SystemTime) -> Duration {
-        (self.duration - self.elapsed(now)).clamp(Duration::ZERO, self.duration)
+        let elapsed = self.elapsed(now);
+
+        if elapsed > self.duration {
+            Duration::ZERO
+        } else {
+            (self.duration - elapsed).clamp(Duration::ZERO, self.duration)
+        }
     }
 
     /// Check if this timer's duration has run out
