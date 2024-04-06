@@ -375,3 +375,108 @@ fn print_progress_bar(pom: &Timer) {
         to_kitchen(&pom.remaining(now)),
     );
 }
+
+#[cfg(test)]
+mod test {
+    use std::time::{Duration, SystemTime};
+
+    use crate::{Pomodoro, format_pomodoro};
+
+    #[test]
+    fn pomodoro_format_wallclock() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let actual_format = format_pomodoro(&pom, "%r", dt);
+
+        assert_eq!(actual_format, "25:00");
+    }
+
+    #[test]
+    fn pomodoro_format_description() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let mut pom = Pomodoro::new(dt, dur);
+        pom.set_description("hello :)");
+
+        let actual_format = format_pomodoro(&pom, "%d", dt);
+
+        assert_eq!(actual_format, "hello :)");
+    }
+
+    #[test]
+    fn pomodoro_format_remaining() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let actual_format = format_pomodoro(&pom, "%R", dt);
+
+        assert_eq!(actual_format, "1500");
+    }
+
+    #[test]
+    fn pomodoro_format_start_iso() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let actual_format = format_pomodoro(&pom, "%s", dt);
+
+        assert_eq!(actual_format, "2024-03-27T12:00:00-06:00");
+    }
+
+    #[test]
+    fn pomodoro_format_start_timestamp() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let actual_format = format_pomodoro(&pom, "%S", dt);
+
+        assert_eq!(actual_format, "1711562400");
+    }
+
+    #[test]
+    fn pomodoro_format_tags() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let mut pom = Pomodoro::new(dt, dur);
+        pom.set_tags(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+        let actual_format = format_pomodoro(&pom, "%t", dt);
+
+        assert_eq!(actual_format, "a,b,c");
+    }
+
+    #[test]
+    fn pomodoro_format_eta() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
+        let dur = Duration::new(25 * 60, 0);
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let actual_format = format_pomodoro(&pom, "%e", dt);
+
+        assert_eq!(actual_format, "2024-03-27T12:25:00-06:00");
+    }
+
+    #[test]
+    fn pomodoro_format_eta_timestamp() {
+        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711563900);
+        let dur = Duration::new(25 * 60, 0);
+
+        let pom = Pomodoro::new(dt, dur);
+
+        let actual_format = format_pomodoro(&pom, "%E", dt);
+
+        assert_eq!(actual_format, "1711563900");
+    }
+}

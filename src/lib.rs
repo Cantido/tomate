@@ -9,15 +9,14 @@
 //! All the interface functions in this module require a [`Config`] struct.
 //! You can load one from a path with [`Config::load`].
 
-use std::{fs::read_to_string, path::{Path, PathBuf}, time::SystemTime};
+use std::{fs::read_to_string, path::Path, time::SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use colored::Colorize;
-use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
 mod config;
-pub use config::Config;
+pub use config::{Config, default_config_path};
 mod history;
 pub use history::History;
 mod hooks;
@@ -141,16 +140,6 @@ pub fn take_long_break(config: &Config, timer: Timer) -> Result<()> {
             Ok(())
         }
     }
-}
-
-/// Get the default location of the config file
-pub fn default_config_path() -> Result<PathBuf> {
-    let conf_path = ProjectDirs::from("dev", "Cosmicrose", "Tomate")
-        .with_context(|| "Unable to determine XDG directories")?
-        .config_dir()
-        .join("config.toml");
-
-    Ok(conf_path)
 }
 
 /// Finish and archive a Pomodoro or break timer
@@ -284,104 +273,5 @@ tags = ["work", "fun"]
         let expected_remaining = Duration::new(5 * 60, 0);
 
         assert_eq!(pom.timer().remaining(dt_later), expected_remaining);
-    }
-
-
-    #[test]
-    fn pomodoro_format_wallclock() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let actual_format = pom.format("%r", dt);
-
-        assert_eq!(actual_format, "25:00");
-    }
-
-    #[test]
-    fn pomodoro_format_description() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let mut pom = Pomodoro::new(dt, dur);
-        pom.set_description("hello :)");
-
-        let actual_format = pom.format("%d", dt);
-
-        assert_eq!(actual_format, "hello :)");
-    }
-
-    #[test]
-    fn pomodoro_format_remaining() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let actual_format = pom.format("%R", dt);
-
-        assert_eq!(actual_format, "1500");
-    }
-
-    #[test]
-    fn pomodoro_format_start_iso() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let actual_format = pom.format("%s", dt);
-
-        assert_eq!(actual_format, "2024-03-27T12:00:00-06:00");
-    }
-
-    #[test]
-    fn pomodoro_format_start_timestamp() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let actual_format = pom.format("%S", dt);
-
-        assert_eq!(actual_format, "1711562400");
-    }
-
-    #[test]
-    fn pomodoro_format_tags() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let mut pom = Pomodoro::new(dt, dur);
-        pom.set_tags(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-
-        let actual_format = pom.format("%t", dt);
-
-        assert_eq!(actual_format, "a,b,c");
-    }
-
-    #[test]
-    fn pomodoro_format_eta() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711562400);
-        let dur = Duration::new(25 * 60, 0);
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let actual_format = pom.format("%e", dt);
-
-        assert_eq!(actual_format, "2024-03-27T12:25:00-06:00");
-    }
-
-    #[test]
-    fn pomodoro_format_eta_timestamp() {
-        let dt: SystemTime = SystemTime::UNIX_EPOCH + Duration::from_secs(1711563900);
-        let dur = Duration::new(25 * 60, 0);
-
-        let pom = Pomodoro::new(dt, dur);
-
-        let actual_format = pom.format("%E", dt);
-
-        assert_eq!(actual_format, "1711563900");
     }
 }
