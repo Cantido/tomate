@@ -3,11 +3,38 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use chrono::{prelude::*, TimeDelta};
 use colored::Colorize;
 use log::info;
 use serde::{Deserialize, Serialize};
 
 use crate::Pomodoro;
+
+/// A record of a past Pomodoro timer
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct HistoryEntry {
+    #[serde(default, with = "crate::time::datetime::unix")]
+    started_at: DateTime<Local>,
+    #[serde(with = "crate::time::duration::seconds")]
+    duration: TimeDelta,
+    tags: Option<Vec<String>>,
+    description: Option<String>,
+}
+
+impl HistoryEntry {
+    pub fn archive(pom: &Pomodoro) -> Result<Self> {
+        let duration = pom
+            .duration()
+            .with_context(|| "Pomodoro is not finished yet")?;
+
+        Ok(Self {
+            duration,
+            started_at: pom.timer().starts_at(),
+            tags: pom.tags().cloned(),
+            description: pom.description().map(|s| s.to_owned()),
+        })
+    }
+}
 
 /// A record of past Pomodoro timers
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -49,7 +76,9 @@ impl History {
             .append(true)
             .open(history_file_path)?;
 
-        let pom_str = toml::to_string(&pomodoro)?;
+        let entry = HistoryEntry::archive(pomodoro)?;
+
+        let pom_str = toml::to_string(&entry)?;
         writeln!(history_file, "[[pomodoros]]\n{}", pom_str)?;
 
         Ok(())

@@ -223,7 +223,7 @@ fn main() -> Result<()> {
             for pom in history.pomodoros().iter() {
                 let date = pom.timer().starts_at().format("%d %b %R").to_string();
                 let dur = to_human(&pom.timer().duration());
-                let tags = pom.tags().unwrap_or(&["-".to_string()]).join(",");
+                let tags = pom.tags().unwrap_or(&vec!["-".to_string()]).join(",");
                 let desc = pom.description().unwrap_or("-");
 
                 table.add_row(Row::new(vec![
