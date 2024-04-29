@@ -1,4 +1,5 @@
-mod datetime;
+#[doc(hidden)]
+pub mod datetime;
 #[doc(hidden)]
 pub mod datetimeopt;
 #[doc(hidden)]

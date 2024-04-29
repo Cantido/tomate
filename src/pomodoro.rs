@@ -41,8 +41,8 @@ impl Pomodoro {
     }
 
     /// Get the tags
-    pub fn tags(&self) -> Option<&[String]> {
-        self.tags.as_deref()
+    pub fn tags(&self) -> Option<&Vec<String>> {
+        self.tags.as_ref()
     }
 
     /// Set the tags
@@ -53,5 +53,14 @@ impl Pomodoro {
     /// Stop running this timer
     pub fn finish(&mut self, now: DateTime<Local>) {
         self.finished_at = Some(now);
+    }
+
+    /// Get the duration that this Pomodoro lasted before it was finished.
+    ///
+    /// This is the actual time between start and finish. If you want to get
+    /// the duration the timer was set for, use the duration of this Pomodoro's [`timer()`].
+    pub fn duration(&self) -> Option<TimeDelta> {
+        self.finished_at
+            .map(|finished_at| finished_at - self.timer.starts_at())
     }
 }
