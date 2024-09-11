@@ -278,7 +278,7 @@ fn duration_from_human(input: &str) -> Result<TimeDelta> {
 
     let total_seconds = (hours * 3600) + (minutes * 60) + seconds;
 
-    Ok(TimeDelta::new(total_seconds, 0).expect("Expected duration to be within valid range"))
+    Ok(TimeDelta::new(total_seconds, 0).expect("Expected duration to be nonzero."))
 }
 
 fn to_human(duration: &TimeDelta) -> String {
