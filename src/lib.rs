@@ -288,7 +288,7 @@ tags = ["work", "fun"]
         assert_eq!(pom.timer().duration(), dur);
         assert_eq!(pom.description(), Some("Do something cool"));
         let tags = vec!["work".to_string(), "fun".to_string()];
-        assert_eq!(pom.tags().unwrap(), tags);
+        assert_eq!(pom.tags().unwrap(), &tags);
     }
 
     #[test]
