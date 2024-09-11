@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use chrono::{prelude::*, TimeDelta};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use human_panic::setup_panic;
 use prettytable::{color, format, Attr, Cell, Row, Table};
 
 use regex::Regex;
@@ -16,6 +17,8 @@ struct Args {
     command: Command,
     /// Config file to use. [default: ${XDG_CONFIG_DIR}/tomate/config.toml]
     config: Option<PathBuf>,
+    #[command(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
 }
 
 #[derive(Debug, Subcommand)]
@@ -75,6 +78,7 @@ enum Command {
 }
 
 fn main() -> Result<()> {
+    setup_panic!();
     env_logger::builder().format_timestamp(None).init();
 
     let args = Args::parse();
