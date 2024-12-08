@@ -19,6 +19,7 @@ struct Args {
     #[command(subcommand)]
     command: Command,
     /// Config file to use. [default: ${XDG_CONFIG_DIR}/tomate/config.toml]
+    #[arg(short, long)]
     config: Option<PathBuf>,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
