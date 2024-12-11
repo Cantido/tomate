@@ -179,28 +179,17 @@ fn main() -> Result<()> {
                 match status {
                     Status::Active(pom) => {
                         if pom.timer().done(Local::now()) {
-                            std::process::Command::new("notify-send")
-                                .args(["Pomodoro completed"])
-                                .output()
-                                .with_context(|| {
-                                    "Failed to send notification for completed Pomodoro"
-                                })?;
+                            tomate::finish(&config)?;
                         }
                     }
                     Status::ShortBreak(timer) => {
                         if timer.done(Local::now()) {
-                            std::process::Command::new("notify-send")
-                                .args(["Short break completed"])
-                                .output()
-                                .with_context(|| "Failed to send notification for short break")?;
+                            tomate::finish(&config)?;
                         }
                     }
                     Status::LongBreak(timer) => {
                         if timer.done(Local::now()) {
-                            std::process::Command::new("notify-send")
-                                .args(["Long break completed"])
-                                .output()
-                                .with_context(|| "Failed to send notification for long break")?;
+                            tomate::finish(&config)?;
                         }
                     }
                     Status::Inactive => {
