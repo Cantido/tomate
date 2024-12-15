@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    io::{self, Write},
+    path::PathBuf,
+};
 
 use anyhow::{Context, Result};
 use chrono::{prelude::*, TimeDelta};
@@ -13,7 +16,7 @@ use tomate::{Config, History, Pomodoro, Status, Timer};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: Command,
     /// Config file to use. [default: ${XDG_CONFIG_DIR}/tomate/config.toml]
     #[arg(short, long)]
@@ -72,10 +75,21 @@ enum Command {
         #[arg(short, long, default_value_t = false)]
         long: bool,
     },
+    /// Interact with system timers
+    Timer {
+        #[command(subcommand)]
+        command: TimerCommand,
+    },
     /// Print a list of all logged Pomodoros
     History,
     /// Delete all state and configuration files
     Purge,
+}
+
+#[derive(Debug, Subcommand)]
+enum TimerCommand {
+    /// Check and execute any completed timers
+    Check,
 }
 
 fn main() -> Result<()> {
@@ -102,6 +116,7 @@ fn main() -> Result<()> {
             tags,
         } => {
             let dur = duration.unwrap_or(config.pomodoro_duration);
+            let timer_seconds = dur.num_seconds();
 
             let mut pom = Pomodoro::new(Local::now(), dur);
             if let Some(desc) = description {
@@ -116,7 +131,19 @@ fn main() -> Result<()> {
 
             tomate::start(&config, pom)?;
 
-            println!();
+            let systemd_output = std::process::Command::new("systemd-run")
+                .args([
+                    "--user".to_string(),
+                    format!("--on-active={}", timer_seconds),
+                    "--timer-property=AccuracySec=100ms".to_string(),
+                    std::env::current_exe()?.to_str().unwrap().to_string(),
+                    "timer".to_string(),
+                    "check".to_string(),
+                ])
+                .output()
+                .with_context(|| "Failed to schedule systemd timer")?;
+
+            io::stdout().write_all(&systemd_output.stderr)?;
 
             print_status(&config, None)?;
         }
@@ -145,6 +172,32 @@ fn main() -> Result<()> {
             println!();
             print_progress_bar(&timer);
         }
+        Command::Timer { command } => match command {
+            TimerCommand::Check => {
+                let status = Status::load(&config.state_file_path)?;
+
+                match status {
+                    Status::Active(pom) => {
+                        if pom.timer().done(Local::now()) {
+                            tomate::finish(&config)?;
+                        }
+                    }
+                    Status::ShortBreak(timer) => {
+                        if timer.done(Local::now()) {
+                            tomate::finish(&config)?;
+                        }
+                    }
+                    Status::LongBreak(timer) => {
+                        if timer.done(Local::now()) {
+                            tomate::finish(&config)?;
+                        }
+                    }
+                    Status::Inactive => {
+                        println!("No timers active");
+                    }
+                }
+            }
+        },
         Command::History => {
             if !config.history_file_path.exists() {
                 return Ok(());
@@ -197,6 +250,22 @@ fn main() -> Result<()> {
 
 fn print_status(config: &Config, format: Option<String>) -> Result<()> {
     let status = Status::load(&config.state_file_path)?;
+
+    if let Some(format) = format {
+        match status {
+            Status::Active(pom) => {
+                println!("{}", format_pomodoro(&pom, &format, Local::now()));
+            }
+            Status::ShortBreak(timer) | Status::LongBreak(timer) => {
+                println!("{}", format_timer(&timer, &format, Local::now()));
+            }
+            Status::Inactive => {
+                // nothing!
+            }
+        }
+
+        return Ok(());
+    }
 
     match status {
         Status::Active(pom) => {
@@ -344,6 +413,15 @@ fn format_pomodoro(pomodoro: &Pomodoro, f: &str, now: DateTime<Local>) -> String
         .replace("%E", &pomodoro.timer().ends_at().timestamp().to_string());
 
     output
+}
+
+fn format_timer(timer: &Timer, f: &str, now: DateTime<Local>) -> String {
+    f.replace("%r", &to_kitchen(&timer.remaining(now)))
+        .replace("%R", &timer.remaining(now).num_seconds().to_string())
+        .replace("%s", &timer.starts_at().to_rfc3339())
+        .replace("%S", &timer.starts_at().timestamp().to_string())
+        .replace("%e", &timer.ends_at().to_rfc3339())
+        .replace("%E", &timer.ends_at().timestamp().to_string())
 }
 
 fn print_progress_bar(pom: &Timer) {
