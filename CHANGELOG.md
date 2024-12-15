@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[unreleased]: https://github.com/Cantido/tomate/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/Cantido/tomate/compare/v0.3.0...HEAD
+
+## [0.3.0] - 2024-12-15
+
+**BREAKING** - This tool was re-licensed to `AGPL-3.0-or-later`.
+
+### Added
+
+- Tomate now sets a systemd timer that invokes the `tomate timer check` command when it expires.
+  This means that tomate will execute hooks as soon as a timer ends, instead of when you run `tomate finish`.
+
+### Changed
+
+- Panics are now a lot more friendly thanks to the [`human_panic`](https://github.com/rust-cli/human-panic) package.
+- History entries now record the actual duration of the Pomodoro timer, not just the duration that the timer was set to.
+
+### Fixed
+
+- The `-c <path>`/`--config=<path>` argument is now correctly handled.
+
+[0.2.0]: https://github.com/Cantido/tomate/compare/v0.2.0..v0.3.0
 
 ## [0.2.0] - 2024-04-06
 
