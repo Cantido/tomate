@@ -16,7 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: github.com/dtolnay/rust-toolchain@stable
+    - uses: wackbyte/rust-toolchain@trunk
+      with:
+        toolchain: stable
     - name: Build
       run: cargo build --verbose
     - name: Run tests
