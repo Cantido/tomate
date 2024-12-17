@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: wackbyte/rust-toolchain@trunk
+    - uses: https://codeberg.org/wackbyte/rust-toolchain@trunk
       with:
         toolchain: stable
     - name: Build
