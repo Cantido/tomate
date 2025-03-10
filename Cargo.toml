@@ -24,5 +24,5 @@ human-panic = "2.0.2"
 log = "0.4.26"
 prettytable-rs = "0.10.0"
 regex = "1.11.1"
-serde = { version = "1.0.218", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.20"
