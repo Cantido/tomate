@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The top-level commands `start`, `finish`, and `clear` were removed in favor of a new command `pomodoro` (`pom` for short) that has its own `show`, `start`, and `stop` commands.
+  This was done to remove some ambiguity (what's the difference between `finish` and `clear`?) and make the interface more consistent (e.g. `pom` for working with pomodoros, `break` for working with breaks).
 - `history` command now accepts a `--json` flag to output history in JSON format.
 
 [unreleased]: https://github.com/Cantido/tomate/compare/v0.4.0...HEAD

@@ -27,7 +27,7 @@ pub use config::{default_config_path, Config};
 mod history;
 pub use history::History;
 mod hooks;
-mod pomodoro;
+pub mod pomodoro;
 pub use pomodoro::Pomodoro;
 mod time;
 pub use time::Timer;
@@ -121,27 +121,6 @@ impl Status {
         writer
             .write_all(contents.as_bytes())
             .with_context(|| "Unable to save Pomodoro to writer")
-    }
-}
-
-/// Start a Pomodoro timer
-pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
-    let status = Status::load(&config.state_file_path)?;
-
-    match status {
-        Status::ShortBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
-        Status::LongBreak(_timer) => Err(anyhow!("You're currently taking a break!")),
-        Status::Active(_pom) => Err(anyhow!("There is already an unfinished Pomodoro")),
-        Status::Inactive => {
-            let next_status = Status::Active(pomodoro);
-            next_status
-                .save(&config.state_file_path)
-                .with_context(|| "Unable to save new Pomodoro")?;
-
-            hooks::Hook::PomodoroStart.run(&config.hooks_directory)?;
-
-            Ok(next_status)
-        }
     }
 }
 

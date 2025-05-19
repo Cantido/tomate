@@ -51,21 +51,12 @@ enum Command {
         #[arg(short, long)]
         format: Option<String>,
     },
-    /// Start a Pomodoro
-    Start {
-        /// Length of the Pomodoro to start
-        #[arg(short, long, value_parser = duration_from_human)]
-        duration: Option<TimeDelta>,
-        /// Description of the task you're focusing on
-        description: Option<String>,
-        /// Tags to categorize the work you're doing, comma-separated
-        #[arg(short, long)]
-        tags: Option<String>,
+    /// Interact with Pomodoro timers
+    #[command(visible_alias("pom"))]
+    Pomodoro {
+        #[command(subcommand)]
+        command: PomodoroCommand,
     },
-    /// Remove the existing Pomodoro, if any
-    Clear,
-    /// Finish a Pomodoro
-    Finish,
     /// Take a break
     Break {
         /// Length of the break to start
@@ -88,6 +79,49 @@ enum Command {
     },
     /// Delete all state and configuration files
     Purge,
+}
+
+/// Commands for the current Pomodoro timer
+#[derive(Debug, Subcommand)]
+enum PomodoroCommand {
+    /// Show the Pomodoro timer that is currently running
+    Show {
+        /// Customize how the current Pomodoro is printed.
+        ///
+        /// Recognizes the following tokens:
+        ///
+        /// %d - description
+        ///
+        /// %t - tags, comma-separated
+        ///
+        /// %r - remaining time, in mm:ss format (or hh:mm:ss if longer than an hour)
+        ///
+        /// %R - remaining time in seconds
+        ///
+        /// %s - start time in RFC 3339 format
+        ///
+        /// %S - start time as a Unix timestamp
+        ///
+        /// %e - end time in RFC 3339 format
+        ///
+        /// %E - end time as a Unix timestamp
+        #[arg(short, long)]
+        format: Option<String>,
+    },
+    /// Start a new Pomodoro timer
+    Start {
+        /// Length of the Pomodoro to start like 2m30s
+        #[arg(short, long, value_parser = duration_from_human)]
+        duration: Option<TimeDelta>,
+        /// Description of the task you're focusing on
+        description: Option<String>,
+        /// Tag to categorize the work you're doing. Can be provided multiple times, one for each
+        /// tag
+        #[arg(short, long)]
+        tag: Vec<String>,
+    },
+    /// Stop the current Pomodoro timer and log it to the history file
+    Stop,
 }
 
 #[derive(Debug, Subcommand)]
@@ -114,49 +148,20 @@ fn main() -> Result<()> {
         Command::Status { format } => {
             print_status(&config, format.clone())?;
         }
-        Command::Start {
-            duration,
-            description,
-            tags,
-        } => {
-            let dur = duration.unwrap_or(config.pomodoro_duration);
-            let timer_seconds = dur.num_seconds();
-
-            let mut pom = Pomodoro::new(Local::now(), dur);
-            if let Some(desc) = description {
-                pom.set_description(desc);
+        Command::Pomodoro { command } => match &command {
+            PomodoroCommand::Show { format } => print_status(&config, format.clone())?,
+            PomodoroCommand::Start {
+                duration,
+                description,
+                tag,
+            } => {
+                tomate::pomodoro::start(&config, duration, description, tag)?;
+                print_status(&config, None)?;
             }
-
-            if let Some(tags) = tags {
-                let tags: Vec<String> = tags.split(',').map(|s| s.to_string()).collect();
-
-                pom.set_tags(tags);
+            PomodoroCommand::Stop => {
+                tomate::pomodoro::stop(&config)?;
             }
-
-            tomate::start(&config, pom)?;
-
-            let systemd_output = std::process::Command::new("systemd-run")
-                .args([
-                    "--user".to_string(),
-                    format!("--on-active={}", timer_seconds),
-                    "--timer-property=AccuracySec=100ms".to_string(),
-                    std::env::current_exe()?.to_str().unwrap().to_string(),
-                    "timer".to_string(),
-                    "check".to_string(),
-                ])
-                .output()
-                .with_context(|| "Failed to schedule systemd timer")?;
-
-            io::stdout().write_all(&systemd_output.stderr)?;
-
-            print_status(&config, None)?;
-        }
-        Command::Finish => {
-            tomate::finish(&config)?;
-        }
-        Command::Clear => {
-            tomate::clear(&config)?;
-        }
+        },
         Command::Break { duration, long } => {
             let timer = if *long {
                 let dur = duration.unwrap_or(config.long_break_duration);
