@@ -57,8 +57,16 @@ $ tomate history
 
 Tomate can run commands when timers start and stop.
 Create an executable script in the hooks directory (by default `${XDG_CONFIG_DIR}/tomate/hooks`)
-called `start`, `stop`, or `break`.
-Tomate will execute these hooks when a Pomodoro starts, a Pomodoro or break stops, and when a break starts, respectively.
+with any of the following names:
+
+- `pomodoro-start`
+- `pomodoro-end`
+- `shortbreak-start`
+- `shortbreak-end`
+- `longbreak-start`
+- `longbreak-end`
+
+Make sure they are executable (`chmod u+x pomodoro-start`).
 
 ## Acknowledgements
 
@@ -67,7 +75,7 @@ It's good enough to rewrite it in Rust.
 
 ## License
 
-Copyright © 2024 Rosa Richter
+Copyright © 2025 Rosa Richter
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 

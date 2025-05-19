@@ -4,53 +4,39 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use log::info;
 
-pub fn run_start_hook(hooks_directory: &Path) -> Result<()> {
-    let start_hook_path = hooks_directory.join("start");
-
-    if start_hook_path.exists() {
-        info!(
-            "Executing start hook at {}",
-            start_hook_path.display().to_string().cyan()
-        );
-
-        std::process::Command::new(start_hook_path)
-            .output()
-            .with_context(|| "Failed to execute start hook")?;
-    }
-
-    Ok(())
+pub enum Hook {
+    PomodoroStart,
+    PomodoroEnd,
+    ShortBreakStart,
+    ShortBreakEnd,
+    LongBreakStart,
+    LongBreakEnd,
 }
 
-pub fn run_stop_hook(hooks_directory: &Path) -> Result<()> {
-    let stop_hook_path = hooks_directory.join("stop");
+impl Hook {
+    pub fn run(&self, hooks_directory: &Path) -> Result<()> {
+        let hook_file_name = match *self {
+            Self::PomodoroStart => "pomodoro-start",
+            Self::PomodoroEnd => "pomodoro-end",
+            Self::ShortBreakStart => "shortbreak-start",
+            Self::ShortBreakEnd => "shortbreak-end",
+            Self::LongBreakStart => "longbreak-start",
+            Self::LongBreakEnd => "longbreak-end",
+        };
 
-    if stop_hook_path.exists() {
-        info!(
-            "Executing stop hook at {}",
-            stop_hook_path.display().to_string().cyan()
-        );
+        let hook_path = hooks_directory.join(hook_file_name);
 
-        std::process::Command::new(stop_hook_path)
-            .output()
-            .with_context(|| "Failed to execute stop hook")?;
+        if hook_path.exists() {
+            info!(
+                "Executing hook at {}",
+                hook_path.display().to_string().cyan()
+            );
+
+            std::process::Command::new(hook_path)
+                .output()
+                .with_context(|| "Failed to execute hook")?;
+        }
+
+        Ok(())
     }
-
-    Ok(())
-}
-
-pub fn run_break_hook(hooks_directory: &Path) -> Result<()> {
-    let break_hook_path = hooks_directory.join("break");
-
-    if break_hook_path.exists() {
-        info!(
-            "Executing break hook at {}",
-            break_hook_path.display().to_string().cyan()
-        );
-
-        std::process::Command::new(break_hook_path)
-            .output()
-            .with_context(|| "Failed to execute break hook")?;
-    }
-
-    Ok(())
 }

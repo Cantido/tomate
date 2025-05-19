@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**BREAKING** - The expected names of hook executables have changed.
+
+### Changed
+
+- The hook executables now have much clearer names. The hook directory has not changed (`${XDG_CONFIG_DIR}/tomate/hooks`). Rename your hook files if you have any. Tomate how looks for files with these names:
+    - `pomodoro-start`
+    - `pomodoro-end`
+    - `shortbreak-start`
+    - `shortbreak-end`
+    - `longbreak-start`
+    - `longbreak-end`
+
 [unreleased]: https://github.com/Cantido/tomate/compare/v0.3.0...HEAD
 
 ## [0.3.0] - 2024-12-15

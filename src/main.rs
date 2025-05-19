@@ -169,6 +169,20 @@ fn main() -> Result<()> {
                 timer
             };
 
+            let systemd_output = std::process::Command::new("systemd-run")
+                .args([
+                    "--user".to_string(),
+                    format!("--on-active={}", timer.duration().as_seconds_f32()),
+                    "--timer-property=AccuracySec=100ms".to_string(),
+                    std::env::current_exe()?.to_str().unwrap().to_string(),
+                    "timer".to_string(),
+                    "check".to_string(),
+                ])
+                .output()
+                .with_context(|| "Failed to schedule systemd timer")?;
+
+            io::stdout().write_all(&systemd_output.stderr)?;
+
             println!();
             print_progress_bar(&timer);
         }

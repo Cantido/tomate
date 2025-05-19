@@ -138,7 +138,7 @@ pub fn start(config: &Config, pomodoro: Pomodoro) -> Result<Status> {
                 .save(&config.state_file_path)
                 .with_context(|| "Unable to save new Pomodoro")?;
 
-            hooks::run_start_hook(&config.hooks_directory)?;
+            hooks::Hook::PomodoroStart.run(&config.hooks_directory)?;
 
             Ok(next_status)
         }
@@ -157,7 +157,7 @@ pub fn take_short_break(config: &Config, timer: Timer) -> Result<()> {
             let new_status = Status::ShortBreak(timer.clone());
             new_status.save(&config.state_file_path)?;
 
-            hooks::run_break_hook(&config.hooks_directory)?;
+            hooks::Hook::ShortBreakStart.run(&config.hooks_directory)?;
 
             Ok(())
         }
@@ -176,7 +176,7 @@ pub fn take_long_break(config: &Config, timer: Timer) -> Result<()> {
             let new_status = Status::ShortBreak(timer.clone());
             new_status.save(&config.state_file_path)?;
 
-            hooks::run_break_hook(&config.hooks_directory)?;
+            hooks::Hook::LongBreakStart.run(&config.hooks_directory)?;
 
             Ok(())
         }
@@ -189,9 +189,19 @@ pub fn finish(config: &Config) -> Result<()> {
 
     match status {
         Status::Inactive => bail!("No active Pomodoro. Start one with \"tomate start\""),
-        Status::ShortBreak(_timer) => clear(config)?,
-        Status::LongBreak(_timer) => clear(config)?,
+        Status::ShortBreak(_timer) => {
+            hooks::Hook::ShortBreakEnd.run(&config.hooks_directory)?;
+
+            clear(config)?
+        }
+        Status::LongBreak(_timer) => {
+            hooks::Hook::LongBreakEnd.run(&config.hooks_directory)?;
+
+            clear(config)?
+        }
         Status::Active(mut pom) => {
+            hooks::Hook::PomodoroEnd.run(&config.hooks_directory)?;
+
             pom.finish(Local::now());
 
             History::append(&pom, &config.history_file_path)?;
@@ -213,8 +223,6 @@ pub fn clear(config: &Config) -> Result<()> {
             &config.state_file_path.display().to_string().cyan()
         );
         std::fs::remove_file(&config.state_file_path)?;
-
-        hooks::run_stop_hook(&config.hooks_directory)?;
     }
 
     Ok(())
