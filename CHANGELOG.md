@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+[unreleased]: https://github.com/Cantido/tomate/compare/v0.4.0...HEAD
+
+## [0.4.0] - 2025-05-19
+
 **BREAKING** - The expected names of hook executables have changed.
 
 ### Changed
@@ -19,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `longbreak-start`
     - `longbreak-end`
 
-[unreleased]: https://github.com/Cantido/tomate/compare/v0.3.0...HEAD
+
+[0.4.0]: https://github.com/Cantido/tomate/compare/v0.3.0..v0.4.0
 
 ## [0.3.0] - 2024-12-15
 
@@ -39,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `-c <path>`/`--config=<path>` argument is now correctly handled.
 
-[0.2.0]: https://github.com/Cantido/tomate/compare/v0.2.0..v0.3.0
+[0.3.0]: https://github.com/Cantido/tomate/compare/v0.2.0..v0.3.0
 
 ## [0.2.0] - 2024-04-06
 
