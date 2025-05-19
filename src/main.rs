@@ -81,7 +81,11 @@ enum Command {
         command: TimerCommand,
     },
     /// Print a list of all logged Pomodoros
-    History,
+    History {
+        /// Print history data in JSON format
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
     /// Delete all state and configuration files
     Purge,
 }
@@ -212,7 +216,7 @@ fn main() -> Result<()> {
                 }
             }
         },
-        Command::History => {
+        Command::History { json } => {
             if !config.history_file_path.exists() {
                 return Ok(());
             }
@@ -221,30 +225,36 @@ fn main() -> Result<()> {
 
             let mut table = Table::new();
 
-            table.set_titles(Row::new(vec![
-                Cell::new("Date Started").with_style(Attr::Underline(true)),
-                Cell::new("Duration").with_style(Attr::Underline(true)),
-                Cell::new("Tags").with_style(Attr::Underline(true)),
-                Cell::new("Description").with_style(Attr::Underline(true)),
-            ]));
+            if *json {
+                let json_str = serde_json::to_string(&history)?;
 
-            for pom in history.pomodoros().iter() {
-                let date = pom.timer().starts_at().format("%d %b %R").to_string();
-                let dur = to_human(&pom.timer().duration());
-                let tags = pom.tags().unwrap_or(&vec!["-".to_string()]).join(",");
-                let desc = pom.description().unwrap_or("-");
-
-                table.add_row(Row::new(vec![
-                    Cell::new(&date).with_style(Attr::ForegroundColor(color::BLUE)),
-                    Cell::new(&dur)
-                        .style_spec("r")
-                        .with_style(Attr::ForegroundColor(color::CYAN)),
-                    Cell::new(&tags),
-                    Cell::new(desc),
+                println!("{}", &json_str);
+            } else {
+                table.set_titles(Row::new(vec![
+                    Cell::new("Date Started").with_style(Attr::Underline(true)),
+                    Cell::new("Duration").with_style(Attr::Underline(true)),
+                    Cell::new("Tags").with_style(Attr::Underline(true)),
+                    Cell::new("Description").with_style(Attr::Underline(true)),
                 ]));
+
+                for pom in history.pomodoros().iter() {
+                    let date = pom.timer().starts_at().format("%d %b %R").to_string();
+                    let dur = to_human(&pom.timer().duration());
+                    let tags = pom.tags().unwrap_or(&vec!["-".to_string()]).join(",");
+                    let desc = pom.description().unwrap_or("-");
+
+                    table.add_row(Row::new(vec![
+                        Cell::new(&date).with_style(Attr::ForegroundColor(color::BLUE)),
+                        Cell::new(&dur)
+                            .style_spec("r")
+                            .with_style(Attr::ForegroundColor(color::CYAN)),
+                        Cell::new(&tags),
+                        Cell::new(desc),
+                    ]));
+                }
+                table.set_format(*format::consts::FORMAT_CLEAN);
+                table.printstd();
             }
-            table.set_format(*format::consts::FORMAT_CLEAN);
-            table.printstd();
         }
         Command::Purge => {
             tomate::purge(&config)?;

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `history` command now accepts a `--json` flag to output history in JSON format.
+
 [unreleased]: https://github.com/Cantido/tomate/compare/v0.4.0...HEAD
 
 ## [0.4.0] - 2025-05-19
