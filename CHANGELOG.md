@@ -7,10 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**BREAKING**
+- The top-level commands `start`, `finish`, `clear`, and `break` were replaced with `pomodoro`, `long-break`, and `short-break` commands with subcommands.
+- The `--tags`/`-t` option was renamed to `--tag` and must now be given once for each separate tag.
+
+### Changed
+
+- The top-level commands `start`, `finish`, `clear`, and `break` were removed in favor of several new commands:
+    - `pomodoro` (`pom` for short)
+    - `short-break` (`short` for short)
+    - `long-break` (`long` for, uh, short)
+  These have their own `start` and `stop` commands.
+  This was done to remove some ambiguity (what's the difference between `finish` and `clear`?) and make the interface more consistent (e.g. `pom` for working with pomodoros, `break` for working with breaks).
+  Run `tomate --help` for documentation on these new commands.
+- The `--tags`/`-t` option was renamed to `--tag` and now no longer takes a comma-separated list of tags. Now it must be given once for each tag (e.g. `tomate pom start -t work -t fun`).
+
+
 ### Added
 
-- The top-level commands `start`, `finish`, and `clear` were removed in favor of a new command `pomodoro` (`pom` for short) that has its own `show`, `start`, and `stop` commands.
-  This was done to remove some ambiguity (what's the difference between `finish` and `clear`?) and make the interface more consistent (e.g. `pom` for working with pomodoros, `break` for working with breaks).
 - `history` command now accepts a `--json` flag to output history in JSON format.
 
 [unreleased]: https://github.com/Cantido/tomate/compare/v0.4.0...HEAD

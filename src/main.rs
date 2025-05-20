@@ -1,7 +1,4 @@
-use std::{
-    io::{self, Write},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use chrono::{prelude::*, TimeDelta};
@@ -57,14 +54,17 @@ enum Command {
         #[command(subcommand)]
         command: PomodoroCommand,
     },
-    /// Take a break
-    Break {
-        /// Length of the break to start
-        #[arg(short, long, value_parser = duration_from_human)]
-        duration: Option<TimeDelta>,
-        /// Take a long break instead of a short break
-        #[arg(short, long, default_value_t = false)]
-        long: bool,
+    /// Interact with short break timers
+    #[command(visible_alias("short"))]
+    ShortBreak {
+        #[command(subcommand)]
+        command: ShortBreakCommand,
+    },
+    /// Interact with long break timers
+    #[command(visible_alias("long"))]
+    LongBreak {
+        #[command(subcommand)]
+        command: LongBreakCommand,
     },
     /// Interact with system timers
     Timer {
@@ -124,6 +124,28 @@ enum PomodoroCommand {
     Stop,
 }
 
+// Commands for working with short breaks
+#[derive(Debug, Subcommand)]
+enum ShortBreakCommand {
+    Start {
+        /// Length of the short break to start like 2m30s
+        #[arg(short, long, value_parser = duration_from_human)]
+        duration: Option<TimeDelta>,
+    },
+    Stop,
+}
+
+// Commands for working with long breaks
+#[derive(Debug, Subcommand)]
+enum LongBreakCommand {
+    Start {
+        /// Length of the long break to start like 2m30s
+        #[arg(short, long, value_parser = duration_from_human)]
+        duration: Option<TimeDelta>,
+    },
+    Stop,
+}
+
 #[derive(Debug, Subcommand)]
 enum TimerCommand {
     /// Check and execute any completed timers
@@ -162,39 +184,20 @@ fn main() -> Result<()> {
                 tomate::pomodoro::stop(&config)?;
             }
         },
-        Command::Break { duration, long } => {
-            let timer = if *long {
-                let dur = duration.unwrap_or(config.long_break_duration);
-                let timer = Timer::new(Local::now(), dur);
-
-                tomate::take_long_break(&config, timer.clone())?;
-                timer
-            } else {
-                let dur = duration.unwrap_or(config.short_break_duration);
-                let timer = Timer::new(Local::now(), dur);
-
-                tomate::take_short_break(&config, timer.clone())?;
-
-                timer
-            };
-
-            let systemd_output = std::process::Command::new("systemd-run")
-                .args([
-                    "--user".to_string(),
-                    format!("--on-active={}", timer.duration().as_seconds_f32()),
-                    "--timer-property=AccuracySec=100ms".to_string(),
-                    std::env::current_exe()?.to_str().unwrap().to_string(),
-                    "timer".to_string(),
-                    "check".to_string(),
-                ])
-                .output()
-                .with_context(|| "Failed to schedule systemd timer")?;
-
-            io::stdout().write_all(&systemd_output.stderr)?;
-
-            println!();
-            print_progress_bar(&timer);
-        }
+        Command::ShortBreak { command } => match &command {
+            ShortBreakCommand::Start { duration } => {
+                tomate::short_break::start(&config, duration)?;
+                print_status(&config, None)?;
+            }
+            ShortBreakCommand::Stop => tomate::short_break::stop(&config)?,
+        },
+        Command::LongBreak { command } => match &command {
+            LongBreakCommand::Start { duration } => {
+                tomate::long_break::start(&config, duration)?;
+                print_status(&config, None)?;
+            }
+            LongBreakCommand::Stop => tomate::long_break::stop(&config)?,
+        },
         Command::Timer { command } => match command {
             TimerCommand::Check => {
                 let status = Status::load(&config.state_file_path)?;
@@ -328,18 +331,20 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
             println!();
             println!(
                 "{}",
-                "(use \"tomate finish\" to archive this Pomodoro)".dimmed()
-            );
-            println!(
-                "{}",
-                "(use \"tomate clear\" to delete this Pomodoro)".dimmed()
+                "(use \"tomate pomodoro stop\" to archive this Pomodoro)".dimmed()
             );
         }
         Status::Inactive => {
             println!("No current Pomodoro");
             println!();
-            println!("{}", "(use \"tomate start\" to start a Pomodoro)".dimmed());
-            println!("{}", "(use \"tomate break\" to take a break)".dimmed());
+            println!(
+                "{}",
+                "(use \"tomate pomodoro start\" to start a Pomodoro)".dimmed()
+            );
+            println!(
+                "{}",
+                "(use \"tomate short-break start\" to take a break)".dimmed()
+            );
         }
         Status::ShortBreak(timer) => {
             println!("Taking a short break");
@@ -350,7 +355,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
 
             println!(
                 "{}",
-                "(use \"tomate finish\" to finish this break)".dimmed()
+                "(use \"tomate short-break stop\" to finish this break)".dimmed()
             );
         }
         Status::LongBreak(timer) => {
@@ -362,7 +367,7 @@ fn print_status(config: &Config, format: Option<String>) -> Result<()> {
 
             println!(
                 "{}",
-                "(use \"tomate finish\" to finish this break)".dimmed()
+                "(use \"tomate long-break stop\" to finish this break)".dimmed()
             );
         }
     }

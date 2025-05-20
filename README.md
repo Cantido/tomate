@@ -10,23 +10,23 @@ Clone this repository and run `cargo install`.
 
 To do a Pomodoro:
 
-1. Start a Pomodoro with `tomate start`
+1. Start a Pomodoro with `tomate pomodoro start`
 2. See remaining time with `tomate status`
-3. End and archive the Pomodoro with `tomate finish`
+3. End and archive the Pomodoro with `tomate pomodoro stop`
 
 To take a break:
 
-1. Start a break with `tomate break`
+1. Start a break with `tomate short-break start`
 2. See remaining time with `tomate status`
-3. End the break with `tomate finish`
+3. End the break with `tomate short-break stop`
 
 ### Description and tags
 
 Provide an optional argument to `start` to give the Pomodoro a description.
-You can also add tags with the `--tags` (`-t`) option.
+You can also add tags with the `--tag` (`-t`) option.
 
 ```console
-$ tomate start -t work,fun "Do something cool"
+$ tomate pomodoro start -t work -t fun "Do something cool"
 $ tomate status
 Current Pomodoro: Do something cool
 Status: Active
@@ -37,8 +37,7 @@ Tags:
 
 Time remaining: 24:22
 
-(use "tomate finish" to archive this Pomodoro)
-(use "tomate clear" to delete this Pomodoro)
+(use "tomate pomodoro stop" to archive this Pomodoro)
 ```
 
 ### History

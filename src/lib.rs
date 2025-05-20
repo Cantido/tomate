@@ -16,7 +16,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use chrono::prelude::*;
 use colored::Colorize;
 use log::info;
@@ -29,6 +29,8 @@ pub use history::History;
 mod hooks;
 pub mod pomodoro;
 pub use pomodoro::Pomodoro;
+pub mod long_break;
+pub mod short_break;
 mod time;
 pub use time::Timer;
 
@@ -121,44 +123,6 @@ impl Status {
         writer
             .write_all(contents.as_bytes())
             .with_context(|| "Unable to save Pomodoro to writer")
-    }
-}
-
-/// Start a short break timer
-pub fn take_short_break(config: &Config, timer: Timer) -> Result<()> {
-    let status = Status::load(&config.state_file_path)?;
-
-    match status {
-        Status::Active(_) => Err(anyhow!("Finish your current timer before taking a break")),
-        Status::ShortBreak(_) => Err(anyhow!("You are already taking a break")),
-        Status::LongBreak(_) => Err(anyhow!("You are already taking a break")),
-        Status::Inactive => {
-            let new_status = Status::ShortBreak(timer.clone());
-            new_status.save(&config.state_file_path)?;
-
-            hooks::Hook::ShortBreakStart.run(&config.hooks_directory)?;
-
-            Ok(())
-        }
-    }
-}
-
-/// Start a long break timer
-pub fn take_long_break(config: &Config, timer: Timer) -> Result<()> {
-    let status = Status::load(&config.state_file_path)?;
-
-    match status {
-        Status::Active(_) => Err(anyhow!("Finish your current timer before taking a break")),
-        Status::ShortBreak(_) => Err(anyhow!("You are already taking a break")),
-        Status::LongBreak(_) => Err(anyhow!("You are already taking a break")),
-        Status::Inactive => {
-            let new_status = Status::ShortBreak(timer.clone());
-            new_status.save(&config.state_file_path)?;
-
-            hooks::Hook::LongBreakStart.run(&config.hooks_directory)?;
-
-            Ok(())
-        }
     }
 }
 
