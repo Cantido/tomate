@@ -1,5 +1,8 @@
 # Tomate
 
+> [!WARNING]
+> This project has been moved to [Codeberg](https://codeberg.org/cosmicrose/tomate).
+
 A Pomodoro timer for the CLI
 
 ## Install
